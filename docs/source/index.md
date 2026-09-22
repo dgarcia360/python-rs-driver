@@ -1,10 +1,10 @@
 # ScyllaDB Python RS Driver
 
-This book contains documentation for [python-rs-driver](https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver) - an ergonomic, asynchronous Python wrapper over the highly performant [ScyllaDB Rust Driver](https://github.com/scylladb/scylla-rust-driver).
+This book contains documentation for [python-rs-driver](https://github.com/scylladb/python-rs-driver) - an ergonomic, asynchronous Python wrapper over the highly performant [ScyllaDB Rust Driver](https://github.com/scylladb/scylla-rust-driver).
 Although optimized for ScyllaDB, the driver is also compatible with [Apache Cassandra®](https://cassandra.apache.org/).
 
 ## Other documentation
-* [Examples](https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver/tree/main/examples)
+* [Examples](https://github.com/scylladb/python-rs-driver/tree/main/examples)
 * [ScyllaDB documentation](https://docs.scylladb.com)
 * [Cassandra® documentation](https://cassandra.apache.org/doc/latest/)
 * [Using ScyllaDB Drivers Course](https://university.scylladb.com/courses/using-scylla-drivers/) at Scylla University.
@@ -20,3 +20,21 @@ Although optimized for ScyllaDB, the driver is also compatible with [Apache Cass
 * [Configuration](topics/configuration/index.md) - Various configuration options and performance tips for the driver.
 * [Security](topics/security/index.md) - Security features, such as authentication and encryption.
 * [Observability](topics/observability/index.md) - Monitoring, logging, and metrics for the driver.
+
+```{eval-rst}
+.. toctree::
+   :hidden:
+   :glob:
+   :titlesonly:
+
+   topics/getting-started
+   topics/architecture-overview
+   topics/installation
+   topics/building
+   topics/testing
+   topics/using/index
+   topics/configuration/index
+   topics/security/index
+   topics/observability/index
+   topics/data-types
+```

@@ -5,9 +5,14 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "pygments>=2.18.0",
-    "sphinx>=8.0.0",
+    "sphinx>=9.0",
     "sphinx-scylladb-theme>=1.9.0",
     "myst-parser>=5.0.0",
-    "sphinx-autobuild>=2025.0",
+    "sphinx-autobuild>=2025.08.25",
+    "sphinx-sitemap>=2.9.0",
+    "sphinx-multiversion-scylla>=0.3.7",
     "sphinx-autodoc-typehints>=3.0.0",
 ]
+
+[tool.uv]
+package = false

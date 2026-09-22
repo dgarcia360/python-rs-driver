@@ -16,6 +16,18 @@ To ensure code quality, we recommend enabling the pre-commit hook that runs stat
 cp scripts/pre-commit.sh .git/hooks/pre-commit
 ```
 
+### Working on the Documentation
+
+From the `docs` directory, run `make preview` to preview documentation changes:
+
+```sh
+cd docs
+make preview
+```
+
+See the [ScyllaDB documentation quickstart](https://sphinx-theme.scylladb.com/stable/getting-started/quickstart.html)
+for prerequisites and guidance on writing pages.
+
 ## Examples
 
 Nothing yet :(

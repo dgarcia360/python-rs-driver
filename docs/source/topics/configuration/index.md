@@ -9,6 +9,7 @@ TBD.
    :glob:
 
    consistency
-   serial_consistency
+   serial-consistency
+   execution-profiles
 
 ```

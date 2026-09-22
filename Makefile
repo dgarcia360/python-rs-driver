@@ -115,7 +115,7 @@ clean: down
 
 .PHONY: docs
 docs:
-	$(MAKE) -C docs html
+	$(MAKE) -C docs dirhtml
 
 .PHONY: docs-preview
 docs-preview:
@@ -124,3 +124,7 @@ docs-preview:
 .PHONY: docs-clean
 docs-clean:
 	$(MAKE) -C docs clean
+
+.PHONY: docs-test
+docs-test:
+	$(MAKE) -C docs test

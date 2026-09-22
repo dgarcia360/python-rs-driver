@@ -57,7 +57,7 @@ async def main():
 asyncio.run(main())
 ```
 
-The full [example](https://github.com/scylladb-zpp-2025-python-rs-driver/python-rs-driver/blob/main/examples/log.py)
+The full [example](https://github.com/scylladb/python-rs-driver/blob/main/examples/log.py)
 is available in the `examples` folder. You can run it from the main folder
 of the driver repository using:
 

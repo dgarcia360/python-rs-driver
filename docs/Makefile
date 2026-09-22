@@ -11,7 +11,7 @@ HOST            ?= 127.0.0.1
 ALLSPHINXOPTS = -d $(BUILDDIR)/doctrees $(SPHINXOPTS) $(SOURCEDIR)
 
 .PHONY: all
-all: html
+all: dirhtml
 
 # Setup commands
 .PHONY: setup
@@ -20,7 +20,7 @@ setup:
 
 .PHONY: update
 update:
-	$(UV) lock --upgrade
+	$(UV) sync --upgrade
 
 # Clean commands
 .PHONY: pristine
@@ -50,4 +50,22 @@ dirhtml: setup
 # Set HOST to choose the preview host (default: 127.0.0.1), e.g. `make preview HOST=0.0.0.0`.
 .PHONY: preview
 preview: setup
-	$(SPHINXAUTOBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html --port $(PORT) --host $(HOST)
+	$(SPHINXAUTOBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml --port $(PORT) --host $(HOST)
+
+# Fail on warnings, matching the theme's PR checks.
+.PHONY: test
+test: setup
+	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) -W --keep-going $(BUILDDIR)/dirhtml
+
+.PHONY: linkcheck
+linkcheck: setup
+	$(SPHINXBUILD) -b linkcheck $(SOURCEDIR) $(BUILDDIR)/linkcheck
+
+# Build the configured Git refs for publication.
+.PHONY: multiversion
+multiversion: setup
+	$(UV) run sphinx-multiversion $(SOURCEDIR) $(BUILDDIR)/dirhtml $(SPHINXOPTS) -W --keep-going
+
+.PHONY: multiversionpreview
+multiversionpreview: multiversion
+	$(UV) run python -m http.server $(PORT) --bind $(HOST) --directory $(BUILDDIR)/dirhtml

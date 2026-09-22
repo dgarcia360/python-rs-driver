@@ -1,8 +1,7 @@
 # Batch statement
 
-<!--TODO: Adjust the names of the files.-->
 A batch statement allows to execute many data-modifying statements at once.\
-These statements can be [unprepared](unprepared.md) or [prepared](prepared.md).\
+These statements can be [unprepared or prepared](statement-values.md#prepared-and-unprepared-statements).\
 Only `INSERT`, `UPDATE` and `DELETE` statements are allowed.
 
 ```python
@@ -34,7 +33,7 @@ await session.batch(batch)
 ```
 
 
-### Batch values
+## Batch values
 When adding statements to a batch, you can separate the statement's text from its values
 using bind markers.\
 Values can be provided as a **list**, a **tuple**, a **mapping**.
@@ -107,7 +106,7 @@ await session.batch(batch)
 > Consider preparing the statements before putting them into the batch.
 
 
-### Batch options
+## Batch options
 You can create batch statement with various options by using `with_*` methods
 on the `Batch` object.\
 **Note:** Calling a `with_*` method **does not modify the existing batch**; instead,
@@ -133,7 +132,7 @@ await session.batch(batch)
 ```
 
 
-### Performance
+## Performance
 Batches use token/shard-aware load balancing, but routing is calculated based **only**
 on the **first statement** in the batch. Therefore, to get full shard awareness, only group
 queries targeting the same partition/shard into the same batch.

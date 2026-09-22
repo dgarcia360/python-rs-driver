@@ -3,7 +3,7 @@
 The driver maps CQL data types to matching Python objects for sending values to the database and receiving values from query results.
 
 See [Statement values](using/statement-values.md) for more information about passing values to statements. 
-See [Query result](query-results.md) for more information about reading values from query results.
+See [Query result](getting-started.md#working-with-results) for more information about reading values from query results.
 
 The table below shows the default Python objects returned by the driver when reading CQL values from query results, and the Python objects that can currently be provided when sending values to the database.
 
