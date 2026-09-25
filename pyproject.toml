@@ -80,6 +80,8 @@ extend-select = ["TID251", "ASYNC"]
 "time.sleep".msg = "Same as asyncio.sleep: wait on an event, not on the clock."
 
 [tool.basedpyright]
+# Sphinx configuration uses the separate dependencies and Python version in docs/pyproject.toml.
+exclude = ["docs/source/conf.py"]
 extraPaths = ["python/tests"]
 pythonVersion = "3.10"
 venvPath = "."
