@@ -4,7 +4,7 @@ use pyo3::types::{PyString, PyTuple};
 use scylla::frame::response::result::{ColumnSpec, PartitionKeyIndex};
 
 use crate::cluster::metadata::column_type::{PyCqlColumnType, extract_column_type};
-use crate::errors::DriverQueryMetadataError;
+use crate::errors::QueryMetadataError;
 
 /// Specification of a column in a result set, used for both prepared statement metadata and query result metadata.
 #[pyclass(name = "ColumnSpec", skip_from_py_object, frozen)]
@@ -108,4 +108,34 @@ pub(crate) fn partition_key_index_tuple(
     }
 
     PyTuple::new(py, ordered).map(Bound::unbind)
+}
+
+/// Errors that can occur during query or prepared statement metadata extraction.
+#[derive(Debug)]
+pub(crate) enum DriverQueryMetadataError {
+    /// An error occurred in Python code or during PyO3 conversion while extracting a column type.
+    ColumnTypeExtractionFailed { source: Box<PyErr> },
+}
+
+impl DriverQueryMetadataError {
+    /* Constructors */
+    pub fn column_type_extraction_failed(source: PyErr) -> Self {
+        Self::ColumnTypeExtractionFailed {
+            source: Box::new(source),
+        }
+    }
+}
+
+impl From<DriverQueryMetadataError> for PyErr {
+    fn from(e: DriverQueryMetadataError) -> PyErr {
+        Python::attach(|py| match e {
+            DriverQueryMetadataError::ColumnTypeExtractionFailed { source } => {
+                let err =
+                    QueryMetadataError::new_err("Failed to extract column type from metadata");
+
+                err.set_cause(py, Some(*source));
+                err
+            }
+        })
+    }
 }

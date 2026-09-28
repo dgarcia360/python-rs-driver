@@ -1,5 +1,6 @@
 use crate::enums::{PyCompression, PyPoolSize, PySelfIdentity, PyWriteCoalescingDelay};
-use crate::errors::{DriverSessionConfigError, DriverSessionConnectionError};
+use crate::errors::config::DriverSessionConfigError;
+use crate::errors::execution::DriverSessionConnectionError;
 use crate::execution_profile::PyExecutionProfile;
 use crate::future::{DriverFuture, boxed_py_future};
 use crate::policies::address_translator::PyAddressTranslator;

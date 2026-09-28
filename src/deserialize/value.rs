@@ -1,5 +1,5 @@
 use crate::deserialize::conversion::{CqlDurationWrapper, CqlVarintWrapper};
-use crate::errors::DriverDeserializationError;
+use crate::deserialize::error::DriverDeserializationError;
 use crate::utils::PyValueOrError;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveTime, Utc};

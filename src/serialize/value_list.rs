@@ -1,4 +1,4 @@
-use crate::errors::DriverSerializationError;
+use crate::serialize::error::DriverSerializationError;
 
 use std::any::Any;
 

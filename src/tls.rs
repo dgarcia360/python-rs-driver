@@ -5,7 +5,8 @@ use pyo3::sync::MutexExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-pub use crate::errors::TlsConfigError;
+use crate::errors::TlsError;
+use crate::errors::config::DriverSessionConfigError;
 use crate::utils::WithOriginalPyObject;
 
 /// Selects the peer certificate verification mode for [`SslConfig`].
@@ -276,4 +277,48 @@ pub(crate) fn tls(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()>
     module.add_class::<PyTlsConfig>()?;
     module.add_class::<PyVerifyMode>()?;
     Ok(())
+}
+
+/* TLS config errors */
+
+/// Errors that can occur while building an [`openssl::ssl::SslContext`] from a TLS config.
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, thiserror::Error)]
+pub enum TlsConfigError {
+    #[error("failed to create SSL context builder: {0}")]
+    ContextCreationFailed(String),
+
+    #[error("failed to load default CA certificate locations: {0}")]
+    DefaultVerifyPathsLoadFailed(String),
+
+    #[error("failed to load CA locations (cafile: {cafile:?}, capath: {capath:?}): {cause}")]
+    CaLocationsLoadFailed {
+        cafile: Option<PathBuf>,
+        capath: Option<PathBuf>,
+        cause: String,
+    },
+
+    #[error("at least one of cafile, capath, or cadata must be specified")]
+    NoCaLocationsSpecified,
+
+    #[error("failed to load CA certificate data: {0}")]
+    CaDataLoadFailed(String),
+
+    #[error("failed to load certificate file '{path}': {cause}")]
+    CertFileLoadFailed { path: PathBuf, cause: String },
+
+    #[error("failed to load private key file '{path}': {cause}")]
+    KeyFileLoadFailed { path: PathBuf, cause: String },
+}
+
+impl From<TlsConfigError> for PyErr {
+    fn from(e: TlsConfigError) -> PyErr {
+        TlsError::new_err(e.to_string())
+    }
+}
+
+impl From<TlsConfigError> for DriverSessionConfigError {
+    fn from(e: TlsConfigError) -> Self {
+        DriverSessionConfigError::InvalidTlsConfig { source: e }
+    }
 }

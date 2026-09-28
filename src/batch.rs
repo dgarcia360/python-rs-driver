@@ -1,9 +1,9 @@
 use crate::core::session::ExecutableStatement;
 use crate::enums::{PyConsistency, PySerialConsistency};
-use crate::errors::DriverBatchError;
+use crate::errors::BatchError;
 use crate::execution_profile::PyExecutionProfile;
 use crate::policies::load_balancing::{PyLoadBalancingPolicy, PyTargetPolicy};
-use crate::policies::retry::policies::PyRetryPolicy;
+use crate::policies::retry::policies::{DriverRetryPolicyError, PyRetryPolicy};
 use crate::serialize::value_list::PyValueList;
 use crate::statement::PyStatementSettings;
 use crate::types::UnsetType;
@@ -321,4 +321,64 @@ pub(crate) fn batch(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<(
     module.add_class::<PyBatch>()?;
     module.add_class::<PyBatchType>()?;
     Ok(())
+}
+
+/// Errors related to batch execution and batch statement configuration.
+#[derive(Debug)]
+#[must_use]
+pub enum DriverBatchError {
+    /// The provided request timeout is not a non-negative finite number of seconds.
+    InvalidRequestTimeout { value: f64 },
+    /// An error occurred in Python code while handling a batch value.
+    PythonConversionFailed { source: Box<PyErr> },
+    /// The provided retry policy is invalid.
+    InvalidRetryPolicy { source: Box<DriverRetryPolicyError> },
+}
+
+impl DriverBatchError {
+    /* Constructors */
+
+    pub fn invalid_request_timeout(value: f64) -> Self {
+        Self::InvalidRequestTimeout { value }
+    }
+
+    pub fn python_conversion_failed(source: PyErr) -> Self {
+        Self::PythonConversionFailed {
+            source: Box::new(source),
+        }
+    }
+
+    pub fn invalid_retry_policy(source: DriverRetryPolicyError) -> Self {
+        Self::InvalidRetryPolicy {
+            source: Box::new(source),
+        }
+    }
+}
+
+impl From<DriverRetryPolicyError> for DriverBatchError {
+    fn from(e: DriverRetryPolicyError) -> Self {
+        Self::invalid_retry_policy(e)
+    }
+}
+
+impl From<DriverBatchError> for PyErr {
+    fn from(e: DriverBatchError) -> PyErr {
+        match e {
+            DriverBatchError::InvalidRequestTimeout { value } => BatchError::new_err(format!(
+                "timeout must be a non-negative, finite number (in seconds), got {value}"
+            )),
+            DriverBatchError::PythonConversionFailed { source } => Python::attach(|py| {
+                let err =
+                    BatchError::new_err("Python conversion failed while handling batch value");
+
+                err.set_cause(py, Some(*source));
+                err
+            }),
+            DriverBatchError::InvalidRetryPolicy { source } => Python::attach(|py| {
+                let err = BatchError::new_err("Invalid retry policy for batch");
+                err.set_cause(py, Some(PyErr::from(*source)));
+                err
+            }),
+        }
+    }
 }

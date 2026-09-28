@@ -1,4 +1,4 @@
-use crate::errors::DriverRetryPolicyError;
+use crate::errors::{RetryPolicyError, get_type_name};
 use crate::policies::retry::decision::PyRetryDecision;
 use crate::policies::retry::request::PyRequestInfo;
 use pyo3::intern;
@@ -299,5 +299,33 @@ impl<'py> FromPyObject<'_, 'py> for PyRetryPolicy {
         }
 
         Err(DriverRetryPolicyError::invalid_policy(obj))
+    }
+}
+
+/* Retry policy errors */
+
+#[derive(Debug)]
+#[must_use]
+pub enum DriverRetryPolicyError {
+    InvalidPolicy { type_name: String },
+}
+
+impl DriverRetryPolicyError {
+    pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
+        let type_name = get_type_name(obj);
+        Self::InvalidPolicy { type_name }
+    }
+}
+
+impl From<DriverRetryPolicyError> for PyErr {
+    fn from(e: DriverRetryPolicyError) -> PyErr {
+        match e {
+            DriverRetryPolicyError::InvalidPolicy { type_name } => {
+                RetryPolicyError::new_err(format!(
+                    "Invalid retry policy '{type_name}': Object does not implement the \
+                     RetryPolicy protocol (missing required 'new_session' method)."
+                ))
+            }
+        }
     }
 }

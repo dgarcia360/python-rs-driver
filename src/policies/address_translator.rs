@@ -1,5 +1,6 @@
-use crate::errors::{DriverAddressTranslationError, DriverSessionConfigError};
-use crate::utils::ParsedAddress;
+use crate::errors::AddressTranslationError;
+use crate::errors::config::DriverSessionConfigError;
+use crate::utils::{AddressParseError, ParsedAddress};
 use async_trait::async_trait;
 use pyo3::IntoPyObject;
 use pyo3::PyErr;
@@ -251,4 +252,54 @@ pub(crate) fn address_translator(_py: Python<'_>, module: &Bound<'_, PyModule>) 
     module.add_class::<PyDictAddressTranslator>()?;
     module.add_class::<PyUntranslatedPeer>()?;
     Ok(())
+}
+
+#[derive(Debug)]
+#[must_use]
+pub enum DriverAddressTranslationError {
+    TranslationError {
+        source: Box<TranslationError>,
+    },
+
+    InvalidAddressAtIndex {
+        index: usize,
+        source: AddressParseError,
+    },
+}
+
+impl DriverAddressTranslationError {
+    pub fn translation_error(source: TranslationError) -> Self {
+        Self::TranslationError {
+            source: Box::new(source),
+        }
+    }
+    pub fn invalid_address(index: usize, source: AddressParseError) -> Self {
+        Self::InvalidAddressAtIndex { index, source }
+    }
+}
+
+impl From<TranslationError> for DriverAddressTranslationError {
+    fn from(source: TranslationError) -> Self {
+        Self::translation_error(source)
+    }
+}
+impl From<DriverAddressTranslationError> for PyErr {
+    fn from(e: DriverAddressTranslationError) -> PyErr {
+        match e {
+            DriverAddressTranslationError::TranslationError { source } => {
+                AddressTranslationError::new_err(format!("Address translation failed: {source}"))
+            }
+            DriverAddressTranslationError::InvalidAddressAtIndex { index, source } => {
+                Python::attach(|py| {
+                    let message = format!("Error processing address at index {index}");
+                    let err = AddressTranslationError::new_err(message);
+                    let cause: PyErr = source.into();
+                    err.set_cause(py, Some(cause));
+                    let inst = err.value(py);
+                    let _ = inst.setattr("index", index);
+                    err
+                })
+            }
+        }
+    }
 }

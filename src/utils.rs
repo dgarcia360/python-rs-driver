@@ -8,7 +8,9 @@ use pyo3::{
     types::{PyAnyMethods, PyModule, PyModuleMethods, PyString},
 };
 
-use crate::errors::{AddressParseError, DurationParseError};
+use std::fmt;
+
+use crate::errors::get_type_name;
 
 #[derive(Clone)]
 pub(crate) struct WithOriginalPyObject<T> {
@@ -221,4 +223,116 @@ pub(crate) fn add_submodule(
         .getattr("modules")?
         .set_item(&full_name, sub_module)?;
     Ok(())
+}
+
+/* Address parsing errors */
+
+/// Error type for address parsing failures.
+#[derive(Debug)]
+pub enum AddressParseError {
+    /// The Python object is not a valid address type (str, tuple(str, int), tuple(IpAddr, int)).
+    InvalidType { type_name: String },
+    /// A string could not be parsed into a SocketAddr.
+    InvalidSocketAddr {
+        addr: String,
+        source: std::net::AddrParseError,
+    },
+    /// Failed to iterate over a sequence of addresses.
+    IterationFailed { source: Box<PyErr> },
+    /// An individual item in an address sequence failed to extract at the given index.
+    InvalidItem { index: usize, source: Box<PyErr> },
+}
+
+impl AddressParseError {
+    pub fn invalid_type(obj: Borrowed<PyAny>) -> Self {
+        Self::InvalidType {
+            type_name: get_type_name(obj),
+        }
+    }
+
+    pub fn iteration_failed(source: PyErr) -> Self {
+        Self::IterationFailed {
+            source: Box::new(source),
+        }
+    }
+
+    pub fn invalid_item(index: usize, source: PyErr) -> Self {
+        Self::InvalidItem {
+            index,
+            source: Box::new(source),
+        }
+    }
+}
+
+impl fmt::Display for AddressParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidType { type_name } => write!(
+                f,
+                "Invalid address type: expected str | tuple(str, int) | tuple(ipaddress, int) or a sequence of these, got {type_name}"
+            ),
+            Self::InvalidSocketAddr { addr, source } => {
+                write!(f, "Invalid socket address '{addr}': {source}")
+            }
+            Self::IterationFailed { .. } => {
+                write!(f, "Failed to iterate over sequence of addresses")
+            }
+            Self::InvalidItem { index, .. } => {
+                write!(f, "Error processing address at index {index}")
+            }
+        }
+    }
+}
+
+impl From<AddressParseError> for PyErr {
+    fn from(e: AddressParseError) -> PyErr {
+        let message = e.to_string();
+        match e {
+            AddressParseError::IterationFailed { source } => Python::attach(|py| {
+                let err = pyo3::exceptions::PyValueError::new_err(message);
+                err.set_cause(py, Some(*source));
+                err
+            }),
+            AddressParseError::InvalidItem { source, .. } => Python::attach(|py| {
+                let err = pyo3::exceptions::PyValueError::new_err(message);
+                err.set_cause(py, Some(*source));
+                err
+            }),
+            _ => pyo3::exceptions::PyValueError::new_err(message),
+        }
+    }
+}
+
+/* Duration parsing errors */
+
+/// Error type for duration parsing failures.
+#[derive(Debug)]
+pub enum DurationParseError {
+    /// The Python object is neither a `datetime.timedelta` nor a non-negative finite float.
+    InvalidType { type_name: String },
+}
+
+impl DurationParseError {
+    pub fn invalid_type(obj: Borrowed<PyAny>) -> Self {
+        Self::InvalidType {
+            type_name: get_type_name(obj),
+        }
+    }
+}
+
+impl fmt::Display for DurationParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidType { type_name } => write!(
+                f,
+                "Expected a datetime.timedelta or a non-negative finite float (seconds), got: {type_name}"
+            ),
+        }
+    }
+}
+
+impl From<DurationParseError> for PyErr {
+    fn from(e: DurationParseError) -> PyErr {
+        pyo3::exceptions::PyValueError::new_err(e.to_string())
+    }
 }

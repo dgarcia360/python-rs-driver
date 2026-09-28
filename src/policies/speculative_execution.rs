@@ -1,7 +1,9 @@
-use crate::errors::DriverSpeculativeExecutionPolicyError;
+use crate::errors::{SpeculativeExecutionPolicyError, get_type_name};
 use crate::utils::PyDuration;
 use pyo3::prelude::{PyModule, PyModuleMethods};
-use pyo3::{Borrowed, Bound, FromPyObject, PyAny, PyResult, Python, pyclass, pymethods, pymodule};
+use pyo3::{
+    Borrowed, Bound, FromPyObject, PyAny, PyErr, PyResult, Python, pyclass, pymethods, pymodule,
+};
 use scylla::policies::speculative_execution::{
     SimpleSpeculativeExecutionPolicy, SpeculativeExecutionPolicy,
 };
@@ -83,4 +85,29 @@ impl<'py> FromPyObject<'_, 'py> for PySpeculativeExecutionPolicy {
 pub(crate) fn speculative_execution(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PySimpleSpeculativeExecutionPolicy>()?;
     Ok(())
+}
+
+/* Speculative execution policy errors */
+
+/// Errors that can occur while extracting a speculative execution policy from a Python object.
+#[derive(Debug, thiserror::Error)]
+pub enum DriverSpeculativeExecutionPolicyError {
+    #[error(
+        "invalid speculative execution policy '{type_name}': expected an instance of 'SimpleSpeculativeExecutionPolicy'"
+    )]
+    InvalidPolicy { type_name: String },
+}
+
+impl DriverSpeculativeExecutionPolicyError {
+    pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
+        Self::InvalidPolicy {
+            type_name: get_type_name(obj),
+        }
+    }
+}
+
+impl From<DriverSpeculativeExecutionPolicyError> for PyErr {
+    fn from(e: DriverSpeculativeExecutionPolicyError) -> PyErr {
+        SpeculativeExecutionPolicyError::new_err(e.to_string())
+    }
 }

@@ -2,7 +2,7 @@ use crate::cluster::node::PyNode;
 use crate::cluster::state::PyClusterState;
 use crate::enums::PyConsistency;
 use crate::enums::PySerialConsistency;
-use crate::errors::{DriverLoadBalancingPolicyError, TargetConversionError};
+use crate::errors::{LoadBalancingPolicyError, get_type_name};
 use crate::routing::PyToken;
 use crate::utils::WithOriginalPyObject;
 use pyo3::PyAny;
@@ -804,4 +804,93 @@ pub(crate) fn load_balancing(_py: Python<'_>, module: &Bound<'_, PyModule>) -> P
     module.add_class::<PySingleTargetPolicy>()?;
     module.add_class::<PyRoutingInfo>()?;
     Ok(())
+}
+
+#[derive(Debug)]
+#[must_use]
+pub enum DriverLoadBalancingPolicyError {
+    InvalidPolicy { type_name: String },
+    DefaultPolicyStringConversionFailed { source: Box<PyErr> },
+}
+
+impl DriverLoadBalancingPolicyError {
+    pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
+        let type_name = obj
+            .get_type()
+            .name()
+            .map(|n| n.to_string())
+            .unwrap_or_else(|_| "UnknownType".to_string());
+        Self::InvalidPolicy { type_name }
+    }
+
+    pub fn default_policy_string_conversion_failed(source: PyErr) -> Self {
+        Self::DefaultPolicyStringConversionFailed {
+            source: Box::new(source),
+        }
+    }
+}
+
+impl From<DriverLoadBalancingPolicyError> for PyErr {
+    fn from(e: DriverLoadBalancingPolicyError) -> PyErr {
+        match e {
+            DriverLoadBalancingPolicyError::InvalidPolicy { type_name } => {
+                LoadBalancingPolicyError::new_err(format!(
+                    "Invalid load balancing policy '{type_name}': Object does not implement the \
+                     LoadBalancingPolicy protocol (missing required 'pick_targets' method)."
+                ))
+            }
+            DriverLoadBalancingPolicyError::DefaultPolicyStringConversionFailed { source } => {
+                Python::attach(|py| {
+                    let err = LoadBalancingPolicyError::new_err(
+                        "String conversion failed while creating default load balancing policy",
+                    );
+                    err.set_cause(py, Some(*source));
+                    err
+                })
+            }
+        }
+    }
+}
+
+/* Target conversion errors */
+
+/// Errors that can occur while converting a Python request target - a `Target`.
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum TargetConversionError {
+    #[error("invalid target node '{type_name}': expected a Node or a host id (uuid.UUID)")]
+    InvalidNode { type_name: String },
+
+    #[error("invalid target: expected a (node, shard) pair, got a tuple of length {len}")]
+    InvalidTupleLen { len: usize },
+
+    #[error("invalid target shard: expected an integer or None")]
+    InvalidShardType { source: Box<PyErr> },
+}
+
+impl TargetConversionError {
+    pub fn invalid_node(obj: Borrowed<PyAny>) -> Self {
+        Self::InvalidNode {
+            type_name: get_type_name(obj),
+        }
+    }
+
+    pub fn invalid_shard_type(source: PyErr) -> Self {
+        Self::InvalidShardType {
+            source: Box::new(source),
+        }
+    }
+}
+
+impl From<TargetConversionError> for PyErr {
+    fn from(e: TargetConversionError) -> PyErr {
+        let err = pyo3::exceptions::PyValueError::new_err(e.to_string());
+
+        if let TargetConversionError::InvalidShardType { source } = e {
+            Python::attach(|py| err.set_cause(py, Some(*source)));
+        }
+
+        err
+    }
 }
