@@ -111,9 +111,10 @@ pub(crate) fn partition_key_index_tuple(
 }
 
 /// Errors that can occur during query or prepared statement metadata extraction.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub(crate) enum DriverQueryMetadataError {
     /// An error occurred in Python code or during PyO3 conversion while extracting a column type.
+    #[error("Failed to extract column type from metadata")]
     ColumnTypeExtractionFailed { source: Box<PyErr> },
 }
 
@@ -128,11 +129,11 @@ impl DriverQueryMetadataError {
 
 impl From<DriverQueryMetadataError> for PyErr {
     fn from(e: DriverQueryMetadataError) -> PyErr {
+        let err = QueryMetadataError::new_err(e.to_string());
         match e {
-            DriverQueryMetadataError::ColumnTypeExtractionFailed { source } => with_cause(
-                QueryMetadataError::new_err("Failed to extract column type from metadata"),
-                *source,
-            ),
+            DriverQueryMetadataError::ColumnTypeExtractionFailed { source } => {
+                with_cause(err, *source)
+            }
         }
     }
 }

@@ -16,109 +16,71 @@ pub struct DriverSerializationError {
     pub location: Option<ParameterReference>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SerializationErrorKind {
     /// Represents a segment in the path to the value that failed to serialize.
+    #[error("Unsupported CQL type: {cql}")]
     UnsupportedType { cql: Box<str> },
     /// The Python value has the wrong top-level shape for the target CQL type.
+    #[error("Type mismatch: expected {expected}")]
     TypeMismatch { expected: TypeExpected },
     /// The Python value could not fit into the requested CQL representation.
+    #[error("Value overflow during serialization")]
     ValueOverflow,
     /// An error occurred while interacting with Python objects during serialization.
+    #[error("Python interop failed: {source}")]
     PythonInteropFailed { source: Box<PyErr> },
     /// An error occurred in the Rust driver's serialization layer.
+    #[error("{source}")]
     ScyllaSerializeFailed {
         source: scylla::serialize::SerializationError,
     },
 }
 
 /// References a parameter that failed to serialize, either by index or by name.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ParameterReference {
+    #[error("parameter_index={0}")]
     Index(usize),
+    #[error("parameter={0}")]
     Name(Box<str>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum TypeExpected {
     /// Expected a list of values for a CQL list or set.
+    #[error("list")]
     List,
     /// Expected a tuple of values for a CQL tuple.
+    #[error("tuple")]
     Tuple,
     /// Expected an iterable of numbers for a CQL vector.
+    #[error("vector")]
     Vector,
     /// Expected a set of values for a CQL set.
+    #[error("set")]
     Set,
     /// Expected a map for a CQL map.
+    #[error("map")]
     Map,
     /// Expected a user-defined type (Udt) for a CQL Udt.
+    #[error("Udt")]
     Udt,
-}
-
-impl fmt::Display for TypeExpected {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TypeExpected::List => write!(f, "list"),
-            TypeExpected::Tuple => write!(f, "tuple"),
-            TypeExpected::Vector => write!(f, "vector"),
-            TypeExpected::Set => write!(f, "set"),
-            TypeExpected::Map => write!(f, "map"),
-            TypeExpected::Udt => write!(f, "Udt"),
-        }
-    }
 }
 
 impl fmt::Display for DriverSerializationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let location = format_serialization_location(&self.location);
-
-        match &self.kind {
-            SerializationErrorKind::UnsupportedType { cql } => {
-                if location.is_empty() {
-                    write!(f, "Unsupported CQL type: {cql}")
-                } else {
-                    write!(f, "Unsupported CQL type: {cql}{location}")
-                }
-            }
-            SerializationErrorKind::TypeMismatch { expected } => {
-                if location.is_empty() {
-                    write!(f, "Type mismatch: expected {expected}")
-                } else {
-                    write!(f, "Type mismatch: expected {expected}{location}")
-                }
-            }
-            SerializationErrorKind::ValueOverflow => {
-                if location.is_empty() {
-                    write!(f, "Value overflow during serialization")
-                } else {
-                    write!(f, "Value overflow during serialization{location}")
-                }
-            }
-            SerializationErrorKind::PythonInteropFailed { source } => {
-                if location.is_empty() {
-                    write!(f, "Python serialization failed: {source}")
-                } else {
-                    write!(f, "Python serialization failed: {source}{location}")
-                }
-            }
-            SerializationErrorKind::ScyllaSerializeFailed { source } => {
-                if location.is_empty() {
-                    write!(f, "{source}")
-                } else {
-                    write!(f, "{source}{location}")
-                }
-            }
+        write!(f, "{}", self.kind)?;
+        if let Some(location) = &self.location {
+            write!(f, " ({location})")?;
         }
+        Ok(())
     }
 }
 
 impl Error for DriverSerializationError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match &self.kind {
-            SerializationErrorKind::PythonInteropFailed { source } => Some(source.as_ref()),
-            SerializationErrorKind::ScyllaSerializeFailed { source } => Some(source),
-            _ => None,
-        }
+        self.kind.source()
     }
 }
 
@@ -175,140 +137,41 @@ impl DriverSerializationError {
     }
 }
 
-/// Helper function to format serialization location information into a readable string.
-fn format_serialization_location(loc: &Option<ParameterReference>) -> String {
-    let mut parts: Vec<String> = Vec::new();
-
-    if let Some(parameter) = &loc {
-        match parameter {
-            ParameterReference::Index(i) => parts.push(format!("parameter_index={i}")),
-            ParameterReference::Name(n) => parts.push(format!("parameter={n}")),
-        }
-    }
-
-    if parts.is_empty() {
-        String::new()
-    } else {
-        format!(" ({})", parts.join(" -> "))
-    }
-}
-
-/// Attaches serialization location attributes to the given Python exception instance.
-fn attach_serialization_location_attrs(
-    py: Python<'_>,
-    err: &Bound<'_, pyo3::exceptions::PyBaseException>,
-    loc: &Option<ParameterReference>,
-) {
-    match &loc {
-        Some(ParameterReference::Index(i)) => {
-            let _ = err.setattr("parameter", *i);
-        }
-        Some(ParameterReference::Name(name)) => {
-            let _ = err.setattr("parameter", name.to_string());
-        }
-        None => {
-            let _ = err.setattr("parameter", py.None());
-        }
-    }
-}
-
-fn build_serialization_pyerr(
-    py: Python<'_>,
-    err: PyErr,
-    location: &Option<ParameterReference>,
-    cause: Option<PyErr>,
-) -> PyErr {
-    if let Some(cause) = cause {
-        err.set_cause(py, Some(cause));
-    }
-
-    attach_serialization_location_attrs(py, err.value(py), location);
-    err
-}
-
 impl From<DriverSerializationError> for PyErr {
     fn from(e: DriverSerializationError) -> PyErr {
-        Python::attach(|py| {
-            let location_as_string = format_serialization_location(&e.location);
-
-            match e.kind {
-                SerializationErrorKind::UnsupportedType { cql } => {
-                    let message = if location_as_string.is_empty() {
-                        format!("Unsupported CQL type: {cql}")
-                    } else {
-                        format!("Unsupported CQL type: {cql}{location_as_string}")
-                    };
-
-                    build_serialization_pyerr(
-                        py,
-                        UnsupportedTypeSerializationError::new_err(message),
-                        &e.location,
-                        None,
-                    )
-                }
-
-                SerializationErrorKind::TypeMismatch { expected } => {
-                    let message = if location_as_string.is_empty() {
-                        format!("Type mismatch: expected {expected}")
-                    } else {
-                        format!("Type mismatch: expected {expected}{location_as_string}")
-                    };
-
-                    build_serialization_pyerr(
-                        py,
-                        TypeMismatchSerializationError::new_err(message),
-                        &e.location,
-                        None,
-                    )
-                }
-
-                SerializationErrorKind::ValueOverflow => {
-                    let message = if location_as_string.is_empty() {
-                        "Value overflow during serialization".to_string()
-                    } else {
-                        format!("Value overflow during serialization{location_as_string}")
-                    };
-
-                    build_serialization_pyerr(
-                        py,
-                        ValueOverflowSerializationError::new_err(message),
-                        &e.location,
-                        None,
-                    )
-                }
-
-                SerializationErrorKind::PythonInteropFailed { source } => {
-                    let message = if location_as_string.is_empty() {
-                        "Python interop failed".to_string()
-                    } else {
-                        format!("Python interop failed{location_as_string}")
-                    };
-
-                    build_serialization_pyerr(
-                        py,
-                        PySerializationFailedError::new_err(message),
-                        &e.location,
-                        Some(*source),
-                    )
-                }
-
-                SerializationErrorKind::ScyllaSerializeFailed { source } => {
-                    let base = source.to_string();
-                    let message = if location_as_string.is_empty() {
-                        base
-                    } else {
-                        format!("{base}{location_as_string}")
-                    };
-
-                    build_serialization_pyerr(
-                        py,
-                        SerializeFailedError::new_err(message),
-                        &e.location,
-                        None,
-                    )
-                }
+        let message = e.to_string();
+        let (err, cause) = match e.kind {
+            SerializationErrorKind::UnsupportedType { .. } => {
+                (UnsupportedTypeSerializationError::new_err(message), None)
             }
-        })
+            SerializationErrorKind::TypeMismatch { .. } => {
+                (TypeMismatchSerializationError::new_err(message), None)
+            }
+            SerializationErrorKind::ValueOverflow => {
+                (ValueOverflowSerializationError::new_err(message), None)
+            }
+            SerializationErrorKind::PythonInteropFailed { source } => {
+                (PySerializationFailedError::new_err(message), Some(*source))
+            }
+            SerializationErrorKind::ScyllaSerializeFailed { .. } => {
+                (SerializeFailedError::new_err(message), None)
+            }
+        };
+
+        Python::attach(|py| {
+            if let Some(cause) = cause {
+                err.set_cause(py, Some(cause));
+            }
+
+            let value = err.value(py);
+            let _ = match &e.location {
+                Some(ParameterReference::Index(i)) => value.setattr("parameter", *i),
+                Some(ParameterReference::Name(name)) => value.setattr("parameter", &**name),
+                None => value.setattr("parameter", py.None()),
+            };
+        });
+
+        err
     }
 }
 

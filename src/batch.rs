@@ -324,14 +324,17 @@ pub(crate) fn batch(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<(
 }
 
 /// Errors related to batch execution and batch statement configuration.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverBatchError {
     /// The provided request timeout is not a non-negative finite number of seconds.
+    #[error("timeout must be a non-negative, finite number (in seconds), got {value}")]
     InvalidRequestTimeout { value: f64 },
     /// An error occurred in Python code while handling a batch value.
+    #[error("Python conversion failed while handling batch value")]
     PythonConversionFailed { source: Box<PyErr> },
     /// The provided retry policy is invalid.
+    #[error("Invalid retry policy for batch")]
     InvalidRetryPolicy { source: Box<DriverRetryPolicyError> },
 }
 
@@ -363,18 +366,11 @@ impl From<DriverRetryPolicyError> for DriverBatchError {
 
 impl From<DriverBatchError> for PyErr {
     fn from(e: DriverBatchError) -> PyErr {
+        let err = BatchError::new_err(e.to_string());
         match e {
-            DriverBatchError::InvalidRequestTimeout { value } => BatchError::new_err(format!(
-                "timeout must be a non-negative, finite number (in seconds), got {value}"
-            )),
-            DriverBatchError::PythonConversionFailed { source } => with_cause(
-                BatchError::new_err("Python conversion failed while handling batch value"),
-                *source,
-            ),
-            DriverBatchError::InvalidRetryPolicy { source } => with_cause(
-                BatchError::new_err("Invalid retry policy for batch"),
-                (*source).into(),
-            ),
+            DriverBatchError::InvalidRequestTimeout { .. } => err,
+            DriverBatchError::PythonConversionFailed { source } => with_cause(err, *source),
+            DriverBatchError::InvalidRetryPolicy { source } => with_cause(err, (*source).into()),
         }
     }
 }

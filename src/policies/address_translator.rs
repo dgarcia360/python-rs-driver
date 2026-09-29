@@ -254,13 +254,13 @@ pub(crate) fn address_translator(_py: Python<'_>, module: &Bound<'_, PyModule>) 
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverAddressTranslationError {
-    TranslationError {
-        source: Box<TranslationError>,
-    },
+    #[error("Address translation failed: {source}")]
+    TranslationError { source: Box<TranslationError> },
 
+    #[error("Error processing address at index {index}")]
     InvalidAddressAtIndex {
         index: usize,
         source: AddressParseError,
@@ -285,13 +285,11 @@ impl From<TranslationError> for DriverAddressTranslationError {
 }
 impl From<DriverAddressTranslationError> for PyErr {
     fn from(e: DriverAddressTranslationError) -> PyErr {
+        let err = AddressTranslationError::new_err(e.to_string());
         match e {
-            DriverAddressTranslationError::TranslationError { source } => {
-                AddressTranslationError::new_err(format!("Address translation failed: {source}"))
-            }
+            DriverAddressTranslationError::TranslationError { .. } => err,
             DriverAddressTranslationError::InvalidAddressAtIndex { index, source } => {
-                let message = format!("Error processing address at index {index}");
-                let err = with_cause(AddressTranslationError::new_err(message), source.into());
+                let err = with_cause(err, source.into());
                 Python::attach(|py| {
                     let _ = err.value(py).setattr("index", index);
                 });

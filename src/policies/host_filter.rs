@@ -275,9 +275,10 @@ pub(crate) fn host_filter(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyRe
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverHostFilterError {
+    #[error("Invalid address in host filter allow list: {source}")]
     InvalidAddress { source: std::io::Error },
 }
 
@@ -289,11 +290,6 @@ impl DriverHostFilterError {
 
 impl From<DriverHostFilterError> for PyErr {
     fn from(e: DriverHostFilterError) -> PyErr {
-        match e {
-            DriverHostFilterError::InvalidAddress { source } => {
-                let message = format!("Invalid address in host filter allow list: {source}");
-                HostFilterError::new_err(message)
-            }
-        }
+        HostFilterError::new_err(e.to_string())
     }
 }

@@ -806,10 +806,15 @@ pub(crate) fn load_balancing(_py: Python<'_>, module: &Bound<'_, PyModule>) -> P
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverLoadBalancingPolicyError {
+    #[error(
+        "Invalid load balancing policy '{type_name}': Object does not implement the \
+         LoadBalancingPolicy protocol (missing required 'pick_targets' method)."
+    )]
     InvalidPolicy { type_name: String },
+    #[error("String conversion failed while creating default load balancing policy")]
     DefaultPolicyStringConversionFailed { source: Box<PyErr> },
 }
 
@@ -829,20 +834,11 @@ impl DriverLoadBalancingPolicyError {
 
 impl From<DriverLoadBalancingPolicyError> for PyErr {
     fn from(e: DriverLoadBalancingPolicyError) -> PyErr {
+        let err = LoadBalancingPolicyError::new_err(e.to_string());
         match e {
-            DriverLoadBalancingPolicyError::InvalidPolicy { type_name } => {
-                LoadBalancingPolicyError::new_err(format!(
-                    "Invalid load balancing policy '{type_name}': Object does not implement the \
-                     LoadBalancingPolicy protocol (missing required 'pick_targets' method)."
-                ))
-            }
+            DriverLoadBalancingPolicyError::InvalidPolicy { .. } => err,
             DriverLoadBalancingPolicyError::DefaultPolicyStringConversionFailed { source } => {
-                with_cause(
-                    LoadBalancingPolicyError::new_err(
-                        "String conversion failed while creating default load balancing policy",
-                    ),
-                    *source,
-                )
+                with_cause(err, *source)
             }
         }
     }

@@ -10,21 +10,20 @@ use crate::errors::{
 /* Connection errors */
 
 /// Errors that can occur during session creation and connection establishment.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverSessionConnectionError {
     /// The Tokio task running session creation failed to join.
-    RuntimeTaskJoinFailed {
-        message: String,
-    },
+    #[error("Internal driver error: runtime error while creating session: {message}")]
+    RuntimeTaskJoinFailed { message: String },
     /// The Rust driver failed to establish a new session.
+    #[error("failed to establish session: {source}")]
     NewSessionError {
         source: Box<scylla::errors::NewSessionError>,
     },
 
-    PythonConversionError {
-        source: PyErr,
-    },
+    #[error(transparent)]
+    PythonConversionError { source: PyErr },
 }
 
 impl DriverSessionConnectionError {
@@ -48,17 +47,8 @@ impl DriverSessionConnectionError {
 impl From<DriverSessionConnectionError> for PyErr {
     fn from(e: DriverSessionConnectionError) -> PyErr {
         match e {
-            DriverSessionConnectionError::RuntimeTaskJoinFailed { message } => {
-                SessionConnectionError::new_err(format!(
-                    "Internal driver error: runtime error while creating session: {message}"
-                ))
-            }
-
-            DriverSessionConnectionError::NewSessionError { source } => {
-                SessionConnectionError::new_err(format!("failed to establish session: {source}"))
-            }
-
             DriverSessionConnectionError::PythonConversionError { source } => source,
+            _ => SessionConnectionError::new_err(e.to_string()),
         }
     }
 }
@@ -72,14 +62,19 @@ impl From<tokio::task::JoinError> for DriverSessionConnectionError {
 }
 
 /// Errors that can occur during conversion of Python objects into statements for execution.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverStatementConversionError {
     /// The provided statement argument is of an unsupported type.
+    #[error(
+        "Invalid statement type: expected a str, Statement, or PreparedStatement, got {type_name}"
+    )]
     InvalidStatementType { type_name: String },
     /// Failed to convert a Python string object into a Rust string when extracting a statement.
+    #[error("Failed to convert statement string to Rust string")]
     StatementStringConversionFailed { source: Box<PyErr> },
     /// Attempted to prepare an already prepared statement.
+    #[error("Cannot prepare a PreparedStatement; expected a str or Statement")]
     CannotPreparePreparedStatement,
 }
 
@@ -104,28 +99,18 @@ impl DriverStatementConversionError {
 
 impl From<DriverStatementConversionError> for PyErr {
     fn from(e: DriverStatementConversionError) -> PyErr {
+        let message = e.to_string();
         match e {
-            DriverStatementConversionError::InvalidStatementType { type_name: got } => {
-                StatementConversionError::new_err(format!(
-                    "Invalid statement type: expected a str, Statement, or PreparedStatement, got {got}"
-                ))
+            DriverStatementConversionError::InvalidStatementType { .. } => {
+                StatementConversionError::new_err(message)
             }
-
             DriverStatementConversionError::StatementStringConversionFailed { source } => {
-                with_cause(
-                    StatementConversionError::new_err(
-                        "Failed to convert statement string to Rust string",
-                    ),
-                    *source,
-                )
+                with_cause(StatementConversionError::new_err(message), *source)
             }
-
             // Raised as a `PrepareError` rather than a `StatementConversionError`:
             // the type is a valid statement, it just cannot be prepared again.
             DriverStatementConversionError::CannotPreparePreparedStatement => {
-                PrepareError::new_err(
-                    "Cannot prepare a PreparedStatement; expected a str or Statement",
-                )
+                PrepareError::new_err(message)
             }
         }
     }
@@ -133,20 +118,24 @@ impl From<DriverStatementConversionError> for PyErr {
 
 /// Errors that can occur during execution of a query (session.execute),
 /// excluding deserialization errors which are represented separately in RowIterationError.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverExecuteError {
     /// paging_state parameter in session.execute must be None.
+    #[error("Paging state must be None for unpaged execution")]
     PagingStateMustBeNoneForUnpagedExecution,
     /// The Rust driver failed while executing a query.
+    #[error("Failed to execute statement: {source}")]
     RustDriverExecutionError {
         source: Box<scylla::errors::ExecutionError>,
     },
     /// Serialization of values failed before execution.
+    #[error("Failed to serialize values: {source}")]
     SerializationFailed {
         source: scylla::serialize::SerializationError,
     },
     /// The Tokio runtime task responsible for executing the query failed to join.
+    #[error("Internal driver error: runtime error while executing query: {message}")]
     RuntimeTaskJoinFailed { message: Box<str> },
 }
 
@@ -176,26 +165,7 @@ impl DriverExecuteError {
 
 impl From<DriverExecuteError> for PyErr {
     fn from(e: DriverExecuteError) -> PyErr {
-        match e {
-            DriverExecuteError::PagingStateMustBeNoneForUnpagedExecution => {
-                ExecuteError::new_err("Paging state must be None for unpaged execution")
-            }
-
-            DriverExecuteError::RustDriverExecutionError { source } => {
-                let message = format!("Failed to execute statement: {source}");
-
-                ExecuteError::new_err(message)
-            }
-
-            DriverExecuteError::RuntimeTaskJoinFailed { message } => ExecuteError::new_err(
-                format!("Internal driver error: runtime error while executing query: {message}"),
-            ),
-
-            DriverExecuteError::SerializationFailed { source } => {
-                let message = format!("Failed to serialize values: {source}");
-                ExecuteError::new_err(message)
-            }
-        }
+        ExecuteError::new_err(e.to_string())
     }
 }
 
@@ -203,17 +173,17 @@ impl From<DriverExecuteError> for PyErr {
 // so that callers that spawn tasks can map JoinError -> ExecuteError via the `From` trait.
 impl From<tokio::task::JoinError> for DriverExecuteError {
     fn from(err: tokio::task::JoinError) -> Self {
-        // Use the existing constructor which accepts JoinError
         DriverExecuteError::runtime_task_join_failed(err)
     }
 }
 
 /// Errors that can occur during preparation of a statement.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverPrepareError {
     /// The Rust driver failed while preparing a statement.
     #[allow(clippy::enum_variant_names)]
+    #[error("Failed to prepare statement: {source}")]
     RustDriverPrepareError {
         source: Box<scylla::errors::PrepareError>,
     },
@@ -231,25 +201,21 @@ impl DriverPrepareError {
 
 impl From<DriverPrepareError> for PyErr {
     fn from(e: DriverPrepareError) -> PyErr {
-        match e {
-            DriverPrepareError::RustDriverPrepareError { source } => {
-                let message = format!("Failed to prepare statement: {source}");
-
-                PrepareError::new_err(message)
-            }
-        }
+        PrepareError::new_err(e.to_string())
     }
 }
 
 /// Errors that can occur during schema agreement checks.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverSchemaAgreementError {
     /// The Rust driver failed to check for schema agreement.
+    #[error("Failed to check schema agreement: {source}")]
     RustDriverSchemaAgreementError {
         source: Box<scylla::errors::SchemaAgreementError>,
     },
     /// The Tokio runtime task responsible for checking schema agreement failed to join.
+    #[error("Internal driver error: runtime error while checking schema agreement: {message}")]
     RuntimeTaskJoinFailed { message: Box<str> },
 }
 
@@ -273,19 +239,7 @@ impl DriverSchemaAgreementError {
 
 impl From<DriverSchemaAgreementError> for PyErr {
     fn from(e: DriverSchemaAgreementError) -> PyErr {
-        match e {
-            DriverSchemaAgreementError::RustDriverSchemaAgreementError { source } => {
-                let message = format!("Failed to check schema agreement: {source}");
-
-                SchemaAgreementError::new_err(message)
-            }
-
-            DriverSchemaAgreementError::RuntimeTaskJoinFailed { message } => {
-                SchemaAgreementError::new_err(format!(
-                    "Internal driver error: runtime error while checking schema agreement: {message}"
-                ))
-            }
-        }
+        SchemaAgreementError::new_err(e.to_string())
     }
 }
 
@@ -298,12 +252,17 @@ impl From<tokio::task::JoinError> for DriverSchemaAgreementError {
 }
 
 /// Errors that can occur during use_keyspace operation on a session object.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub(crate) enum DriverUseKeyspaceError {
+    #[error("{message}")]
     BadKeyspaceName { message: String },
+    #[error("{message}")]
     RequestError { message: String },
+    #[error("{message}")]
     KeyspaceNameMismatch { message: String },
+    #[error("{message}")]
     RequestTimeout { message: String },
+    #[error("{message}")]
     RuntimeTaskJoinFailed { message: String },
 }
 
@@ -341,18 +300,17 @@ impl From<tokio::task::JoinError> for DriverUseKeyspaceError {
 
 impl From<DriverUseKeyspaceError> for PyErr {
     fn from(e: DriverUseKeyspaceError) -> Self {
+        let message = e.to_string();
         match e {
-            DriverUseKeyspaceError::BadKeyspaceName { message } => {
+            DriverUseKeyspaceError::BadKeyspaceName { .. } => {
                 BadKeyspaceNameError::new_err(message)
             }
-            DriverUseKeyspaceError::RequestError { message } => RequestError::new_err(message),
-            DriverUseKeyspaceError::KeyspaceNameMismatch { message } => {
+            DriverUseKeyspaceError::RequestError { .. } => RequestError::new_err(message),
+            DriverUseKeyspaceError::KeyspaceNameMismatch { .. } => {
                 KeyspaceNameMismatchError::new_err(message)
             }
-            DriverUseKeyspaceError::RequestTimeout { message } => {
-                RequestTimeoutError::new_err(message)
-            }
-            DriverUseKeyspaceError::RuntimeTaskJoinFailed { message } => {
+            DriverUseKeyspaceError::RequestTimeout { .. } => RequestTimeoutError::new_err(message),
+            DriverUseKeyspaceError::RuntimeTaskJoinFailed { .. } => {
                 RuntimeTaskJoinFailedError::new_err(message)
             }
         }

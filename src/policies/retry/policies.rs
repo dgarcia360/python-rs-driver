@@ -304,9 +304,13 @@ impl<'py> FromPyObject<'_, 'py> for PyRetryPolicy {
 
 /* Retry policy errors */
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum DriverRetryPolicyError {
+    #[error(
+        "Invalid retry policy '{type_name}': Object does not implement the \
+         RetryPolicy protocol (missing required 'new_session' method)."
+    )]
     InvalidPolicy { type_name: String },
 }
 
@@ -319,13 +323,6 @@ impl DriverRetryPolicyError {
 
 impl From<DriverRetryPolicyError> for PyErr {
     fn from(e: DriverRetryPolicyError) -> PyErr {
-        match e {
-            DriverRetryPolicyError::InvalidPolicy { type_name } => {
-                RetryPolicyError::new_err(format!(
-                    "Invalid retry policy '{type_name}': Object does not implement the \
-                     RetryPolicy protocol (missing required 'new_session' method)."
-                ))
-            }
-        }
+        RetryPolicyError::new_err(e.to_string())
     }
 }

@@ -163,15 +163,19 @@ impl PyClusterState {
 }
 
 /// Errors that can occur during cluster state operations.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub(crate) enum DriverClusterStateTokenError {
     /// Failed to calculate token.
+    #[error("{message}")]
     TokenCalculation { message: String },
     /// Failed to serialize values required to compute partition key.
+    #[error("{message}")]
     Serialization { message: String },
     /// `ClusterState` doesn't currently have metadata for the requested table.
+    #[error("{message}")]
     UnknownTable { message: String },
     /// An FFI-related error occurred (e.g., Python conversion, node creation).
+    #[error(transparent)]
     PythonConversionFailed(PyErr),
 }
 
@@ -202,16 +206,8 @@ impl From<RustClusterStateTokenError> for DriverClusterStateTokenError {
 impl From<DriverClusterStateTokenError> for PyErr {
     fn from(e: DriverClusterStateTokenError) -> PyErr {
         match e {
-            DriverClusterStateTokenError::TokenCalculation { message } => {
-                ClusterStateTokenError::new_err(message)
-            }
-            DriverClusterStateTokenError::Serialization { message } => {
-                ClusterStateTokenError::new_err(message)
-            }
-            DriverClusterStateTokenError::UnknownTable { message } => {
-                ClusterStateTokenError::new_err(message)
-            }
             DriverClusterStateTokenError::PythonConversionFailed(err) => err,
+            _ => ClusterStateTokenError::new_err(e.to_string()),
         }
     }
 }
