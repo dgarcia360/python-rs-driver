@@ -18,7 +18,7 @@ use crate::batch::PyBatch;
 use crate::cluster::state::PyClusterState;
 use crate::core::results::{Pager, RequestResultCore};
 use crate::deserialize::results::{RequestResult, RowFactory};
-use crate::errors::{
+use crate::errors::execution::{
     DriverExecuteError, DriverPrepareError, DriverSchemaAgreementError,
     DriverStatementConversionError, DriverUseKeyspaceError,
 };

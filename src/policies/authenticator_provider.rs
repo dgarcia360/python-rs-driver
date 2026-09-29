@@ -1,4 +1,4 @@
-use crate::errors::DriverSessionConfigError;
+use crate::errors::config::DriverSessionConfigError;
 use async_trait::async_trait;
 use pyo3::exceptions::PyNotImplementedError;
 use pyo3::prelude::{PyAnyMethods, PyModule, PyModuleMethods};

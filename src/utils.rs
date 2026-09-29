@@ -8,7 +8,7 @@ use pyo3::{
     types::{PyAnyMethods, PyModule, PyModuleMethods, PyString},
 };
 
-use crate::errors::{AddressParseError, DurationParseError};
+use crate::errors::{get_type_name, with_cause};
 
 #[derive(Clone)]
 pub(crate) struct WithOriginalPyObject<T> {
@@ -221,4 +221,86 @@ pub(crate) fn add_submodule(
         .getattr("modules")?
         .set_item(&full_name, sub_module)?;
     Ok(())
+}
+
+/* Address parsing errors */
+
+/// Error type for address parsing failures.
+#[derive(Debug, thiserror::Error)]
+pub enum AddressParseError {
+    /// The Python object is not a valid address type (str, tuple(str, int), tuple(IpAddr, int)).
+    #[error(
+        "Invalid address type: expected str | tuple(str, int) | tuple(ipaddress, int) or a sequence of these, got {type_name}"
+    )]
+    InvalidType { type_name: String },
+    /// A string could not be parsed into a SocketAddr.
+    #[error("Invalid socket address '{addr}': {source}")]
+    InvalidSocketAddr {
+        addr: String,
+        source: std::net::AddrParseError,
+    },
+    /// Failed to iterate over a sequence of addresses.
+    #[error("Failed to iterate over sequence of addresses")]
+    IterationFailed { source: Box<PyErr> },
+    /// An individual item in an address sequence failed to extract at the given index.
+    #[error("Error processing address at index {index}")]
+    InvalidItem { index: usize, source: Box<PyErr> },
+}
+
+impl AddressParseError {
+    pub(crate) fn invalid_type(obj: Borrowed<PyAny>) -> Self {
+        Self::InvalidType {
+            type_name: get_type_name(obj),
+        }
+    }
+
+    pub(crate) fn iteration_failed(source: PyErr) -> Self {
+        Self::IterationFailed {
+            source: Box::new(source),
+        }
+    }
+
+    pub(crate) fn invalid_item(index: usize, source: PyErr) -> Self {
+        Self::InvalidItem {
+            index,
+            source: Box::new(source),
+        }
+    }
+}
+
+impl From<AddressParseError> for PyErr {
+    fn from(e: AddressParseError) -> PyErr {
+        let err = pyo3::exceptions::PyValueError::new_err(e.to_string());
+        match e {
+            AddressParseError::IterationFailed { source }
+            | AddressParseError::InvalidItem { source, .. } => with_cause(err, *source),
+            _ => err,
+        }
+    }
+}
+
+/* Duration parsing errors */
+
+/// Error type for duration parsing failures.
+#[derive(Debug, thiserror::Error)]
+pub enum DurationParseError {
+    /// The Python object is neither a `datetime.timedelta` nor a non-negative finite float.
+    #[error(
+        "Expected a datetime.timedelta or a non-negative finite float (seconds), got: {type_name}"
+    )]
+    InvalidType { type_name: String },
+}
+
+impl DurationParseError {
+    pub(crate) fn invalid_type(obj: Borrowed<PyAny>) -> Self {
+        Self::InvalidType {
+            type_name: get_type_name(obj),
+        }
+    }
+}
+
+impl From<DurationParseError> for PyErr {
+    fn from(e: DurationParseError) -> PyErr {
+        pyo3::exceptions::PyValueError::new_err(e.to_string())
+    }
 }

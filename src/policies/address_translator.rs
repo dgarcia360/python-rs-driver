@@ -1,5 +1,6 @@
-use crate::errors::{DriverAddressTranslationError, DriverSessionConfigError};
-use crate::utils::ParsedAddress;
+use crate::errors::config::DriverSessionConfigError;
+use crate::errors::{AddressTranslationError, with_cause};
+use crate::utils::{AddressParseError, ParsedAddress};
 use async_trait::async_trait;
 use pyo3::IntoPyObject;
 use pyo3::PyErr;
@@ -251,4 +252,49 @@ pub(crate) fn address_translator(_py: Python<'_>, module: &Bound<'_, PyModule>) 
     module.add_class::<PyDictAddressTranslator>()?;
     module.add_class::<PyUntranslatedPeer>()?;
     Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum DriverAddressTranslationError {
+    #[error("Address translation failed: {source}")]
+    TranslationError { source: Box<TranslationError> },
+
+    #[error("Error processing address at index {index}")]
+    InvalidAddressAtIndex {
+        index: usize,
+        source: AddressParseError,
+    },
+}
+
+impl DriverAddressTranslationError {
+    pub(crate) fn translation_error(source: TranslationError) -> Self {
+        Self::TranslationError {
+            source: Box::new(source),
+        }
+    }
+    pub(crate) fn invalid_address(index: usize, source: AddressParseError) -> Self {
+        Self::InvalidAddressAtIndex { index, source }
+    }
+}
+
+impl From<TranslationError> for DriverAddressTranslationError {
+    fn from(source: TranslationError) -> Self {
+        Self::translation_error(source)
+    }
+}
+impl From<DriverAddressTranslationError> for PyErr {
+    fn from(e: DriverAddressTranslationError) -> PyErr {
+        let err = AddressTranslationError::new_err(e.to_string());
+        match e {
+            DriverAddressTranslationError::TranslationError { .. } => err,
+            DriverAddressTranslationError::InvalidAddressAtIndex { index, source } => {
+                let err = with_cause(err, source.into());
+                Python::attach(|py| {
+                    let _ = err.value(py).setattr("index", index);
+                });
+                err
+            }
+        }
+    }
 }

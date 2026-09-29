@@ -1,7 +1,7 @@
 use crate::cluster::metadata::query_metadata::column_spec_tuple;
 use crate::core::results::{Pager, RequestResultCore, next_row_with_paging};
+use crate::deserialize::error::{DriverDeserializationError, DriverRowIterationError};
 use crate::deserialize::value::{PyDeserializeValue, PyDeserializedValue};
-use crate::errors::{DriverDeserializationError, DriverRowIterationError};
 use crate::future::{DriverFuture, boxed_py_future};
 use pyo3::exceptions::{PyRuntimeError, PyStopAsyncIteration, PyStopIteration};
 use pyo3::prelude::{PyDictMethods, PyModule, PyModuleMethods};

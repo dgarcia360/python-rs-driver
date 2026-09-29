@@ -1,4 +1,4 @@
-use crate::errors::DriverSessionConfigError;
+use crate::errors::config::DriverSessionConfigError;
 use crate::utils::PyDuration;
 use pyo3::intern;
 use pyo3::prelude::*;

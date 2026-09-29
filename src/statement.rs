@@ -1,5 +1,5 @@
 use crate::enums::{PyConsistency, PySerialConsistency};
-use crate::errors::DriverStatementConfigError;
+use crate::errors::config::DriverStatementConfigError;
 use crate::execution_profile::PyExecutionProfile;
 use crate::policies::retry::policies::PyRetryPolicy;
 use crate::types::UnsetType;

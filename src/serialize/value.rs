@@ -1,4 +1,4 @@
-use crate::errors::{DriverSerializationError, TypeExpected};
+use crate::serialize::error::{DriverSerializationError, TypeExpected};
 
 use std::any::Any;
 use std::net::IpAddr;

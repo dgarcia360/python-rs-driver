@@ -1,4 +1,5 @@
-use crate::errors::{DriverHostFilterError, DriverSessionConfigError};
+use crate::errors::HostFilterError;
+use crate::errors::config::DriverSessionConfigError;
 use crate::routing::PyToken;
 use crate::utils::{ParsedAddressList, PyValueOrError};
 use pyo3::IntoPyObject;
@@ -272,4 +273,23 @@ pub(crate) fn host_filter(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyRe
     module.add_class::<PyAllowListHostFilter>()?;
     module.add_class::<PyPeer>()?;
     Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum DriverHostFilterError {
+    #[error("Invalid address in host filter allow list: {source}")]
+    InvalidAddress { source: std::io::Error },
+}
+
+impl DriverHostFilterError {
+    pub(crate) fn invalid_address(source: std::io::Error) -> Self {
+        Self::InvalidAddress { source }
+    }
+}
+
+impl From<DriverHostFilterError> for PyErr {
+    fn from(e: DriverHostFilterError) -> PyErr {
+        HostFilterError::new_err(e.to_string())
+    }
 }

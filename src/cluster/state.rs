@@ -5,12 +5,13 @@ use pyo3::{
     types::{PyDict, PyList, PyMappingProxy, PyString},
 };
 use scylla::cluster::ClusterState;
+use scylla::errors::ClusterStateTokenError as RustClusterStateTokenError;
 
 use crate::{
     cache::Cache,
     cluster::metadata::PyKeyspace,
     cluster::node::PyNode,
-    errors::DriverClusterStateTokenError,
+    errors::ClusterStateTokenError,
     routing::{PyReplicaLocator, PyToken},
     serialize::value_list::PyValueList,
 };
@@ -158,5 +159,31 @@ impl PyClusterState {
                 self.inner.keyspaces_iter().collect::<Vec<_>>()
             ),
         )
+    }
+}
+
+/// Errors that can occur during cluster state operations.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum DriverClusterStateTokenError {
+    /// The Rust driver failed to compute the token (calculation, serialization or unknown table).
+    #[error(transparent)]
+    RustDriverTokenError(#[from] RustClusterStateTokenError),
+    /// An FFI-related error occurred (e.g., Python conversion, node creation).
+    #[error(transparent)]
+    PythonConversionFailed(PyErr),
+}
+
+impl DriverClusterStateTokenError {
+    pub(crate) fn python_conversion_failed(err: PyErr) -> Self {
+        Self::PythonConversionFailed(err)
+    }
+}
+
+impl From<DriverClusterStateTokenError> for PyErr {
+    fn from(e: DriverClusterStateTokenError) -> PyErr {
+        match e {
+            DriverClusterStateTokenError::PythonConversionFailed(err) => err,
+            _ => ClusterStateTokenError::new_err(e.to_string()),
+        }
     }
 }
