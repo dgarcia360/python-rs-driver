@@ -2,7 +2,7 @@ use crate::cluster::node::PyNode;
 use crate::cluster::state::PyClusterState;
 use crate::enums::PyConsistency;
 use crate::enums::PySerialConsistency;
-use crate::errors::{LoadBalancingPolicyError, get_type_name};
+use crate::errors::{LoadBalancingPolicyError, get_type_name, with_cause};
 use crate::routing::PyToken;
 use crate::utils::WithOriginalPyObject;
 use pyo3::PyAny;
@@ -840,13 +840,12 @@ impl From<DriverLoadBalancingPolicyError> for PyErr {
                 ))
             }
             DriverLoadBalancingPolicyError::DefaultPolicyStringConversionFailed { source } => {
-                Python::attach(|py| {
-                    let err = LoadBalancingPolicyError::new_err(
+                with_cause(
+                    LoadBalancingPolicyError::new_err(
                         "String conversion failed while creating default load balancing policy",
-                    );
-                    err.set_cause(py, Some(*source));
-                    err
-                })
+                    ),
+                    *source,
+                )
             }
         }
     }
@@ -886,11 +885,9 @@ impl TargetConversionError {
 impl From<TargetConversionError> for PyErr {
     fn from(e: TargetConversionError) -> PyErr {
         let err = pyo3::exceptions::PyValueError::new_err(e.to_string());
-
-        if let TargetConversionError::InvalidShardType { source } = e {
-            Python::attach(|py| err.set_cause(py, Some(*source)));
+        match e {
+            TargetConversionError::InvalidShardType { source } => with_cause(err, *source),
+            _ => err,
         }
-
-        err
     }
 }

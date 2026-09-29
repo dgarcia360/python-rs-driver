@@ -1,6 +1,6 @@
 use crate::core::session::ExecutableStatement;
 use crate::enums::{PyConsistency, PySerialConsistency};
-use crate::errors::BatchError;
+use crate::errors::{BatchError, with_cause};
 use crate::execution_profile::PyExecutionProfile;
 use crate::policies::load_balancing::{PyLoadBalancingPolicy, PyTargetPolicy};
 use crate::policies::retry::policies::{DriverRetryPolicyError, PyRetryPolicy};
@@ -367,18 +367,14 @@ impl From<DriverBatchError> for PyErr {
             DriverBatchError::InvalidRequestTimeout { value } => BatchError::new_err(format!(
                 "timeout must be a non-negative, finite number (in seconds), got {value}"
             )),
-            DriverBatchError::PythonConversionFailed { source } => Python::attach(|py| {
-                let err =
-                    BatchError::new_err("Python conversion failed while handling batch value");
-
-                err.set_cause(py, Some(*source));
-                err
-            }),
-            DriverBatchError::InvalidRetryPolicy { source } => Python::attach(|py| {
-                let err = BatchError::new_err("Invalid retry policy for batch");
-                err.set_cause(py, Some(PyErr::from(*source)));
-                err
-            }),
+            DriverBatchError::PythonConversionFailed { source } => with_cause(
+                BatchError::new_err("Python conversion failed while handling batch value"),
+                *source,
+            ),
+            DriverBatchError::InvalidRetryPolicy { source } => with_cause(
+                BatchError::new_err("Invalid retry policy for batch"),
+                (*source).into(),
+            ),
         }
     }
 }

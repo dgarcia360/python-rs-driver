@@ -10,7 +10,7 @@ use pyo3::{
 
 use std::fmt;
 
-use crate::errors::get_type_name;
+use crate::errors::{get_type_name, with_cause};
 
 #[derive(Clone)]
 pub(crate) struct WithOriginalPyObject<T> {
@@ -286,19 +286,11 @@ impl fmt::Display for AddressParseError {
 
 impl From<AddressParseError> for PyErr {
     fn from(e: AddressParseError) -> PyErr {
-        let message = e.to_string();
+        let err = pyo3::exceptions::PyValueError::new_err(e.to_string());
         match e {
-            AddressParseError::IterationFailed { source } => Python::attach(|py| {
-                let err = pyo3::exceptions::PyValueError::new_err(message);
-                err.set_cause(py, Some(*source));
-                err
-            }),
-            AddressParseError::InvalidItem { source, .. } => Python::attach(|py| {
-                let err = pyo3::exceptions::PyValueError::new_err(message);
-                err.set_cause(py, Some(*source));
-                err
-            }),
-            _ => pyo3::exceptions::PyValueError::new_err(message),
+            AddressParseError::IterationFailed { source }
+            | AddressParseError::InvalidItem { source, .. } => with_cause(err, *source),
+            _ => err,
         }
     }
 }

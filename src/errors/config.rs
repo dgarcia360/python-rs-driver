@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
 
-use crate::errors::{SessionConfigError, StatementConfigError, TlsError, get_type_name};
+use crate::errors::{
+    SessionConfigError, StatementConfigError, TlsError, get_type_name, with_cause,
+};
 use crate::policies::retry::policies::DriverRetryPolicyError;
 use crate::tls::TlsConfigError;
 use crate::utils::AddressParseError;
@@ -191,19 +193,16 @@ impl From<DriverStatementConfigError> for PyErr {
                     "timeout must be a non-negative, finite number (in seconds), got {value}"
                 ))
             }
-            DriverStatementConfigError::PythonConversionFailed { source } => Python::attach(|py| {
-                let err = StatementConfigError::new_err(
+            DriverStatementConfigError::PythonConversionFailed { source } => with_cause(
+                StatementConfigError::new_err(
                     "Python conversion failed while handling batch value",
-                );
-
-                err.set_cause(py, Some(*source));
-                err
-            }),
-            DriverStatementConfigError::InvalidRetryPolicy { source } => Python::attach(|py| {
-                let err = StatementConfigError::new_err("Invalid retry policy");
-                err.set_cause(py, Some(PyErr::from(*source)));
-                err
-            }),
+                ),
+                *source,
+            ),
+            DriverStatementConfigError::InvalidRetryPolicy { source } => with_cause(
+                StatementConfigError::new_err("Invalid retry policy"),
+                (*source).into(),
+            ),
         }
     }
 }

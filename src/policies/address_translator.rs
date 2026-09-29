@@ -1,5 +1,5 @@
-use crate::errors::AddressTranslationError;
 use crate::errors::config::DriverSessionConfigError;
+use crate::errors::{AddressTranslationError, with_cause};
 use crate::utils::{AddressParseError, ParsedAddress};
 use async_trait::async_trait;
 use pyo3::IntoPyObject;
@@ -290,15 +290,12 @@ impl From<DriverAddressTranslationError> for PyErr {
                 AddressTranslationError::new_err(format!("Address translation failed: {source}"))
             }
             DriverAddressTranslationError::InvalidAddressAtIndex { index, source } => {
+                let message = format!("Error processing address at index {index}");
+                let err = with_cause(AddressTranslationError::new_err(message), source.into());
                 Python::attach(|py| {
-                    let message = format!("Error processing address at index {index}");
-                    let err = AddressTranslationError::new_err(message);
-                    let cause: PyErr = source.into();
-                    err.set_cause(py, Some(cause));
-                    let inst = err.value(py);
-                    let _ = inst.setattr("index", index);
-                    err
-                })
+                    let _ = err.value(py).setattr("index", index);
+                });
+                err
             }
         }
     }

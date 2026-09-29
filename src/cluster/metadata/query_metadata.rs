@@ -4,7 +4,7 @@ use pyo3::types::{PyString, PyTuple};
 use scylla::frame::response::result::{ColumnSpec, PartitionKeyIndex};
 
 use crate::cluster::metadata::column_type::{PyCqlColumnType, extract_column_type};
-use crate::errors::QueryMetadataError;
+use crate::errors::{QueryMetadataError, with_cause};
 
 /// Specification of a column in a result set, used for both prepared statement metadata and query result metadata.
 #[pyclass(name = "ColumnSpec", skip_from_py_object, frozen)]
@@ -128,14 +128,11 @@ impl DriverQueryMetadataError {
 
 impl From<DriverQueryMetadataError> for PyErr {
     fn from(e: DriverQueryMetadataError) -> PyErr {
-        Python::attach(|py| match e {
-            DriverQueryMetadataError::ColumnTypeExtractionFailed { source } => {
-                let err =
-                    QueryMetadataError::new_err("Failed to extract column type from metadata");
-
-                err.set_cause(py, Some(*source));
-                err
-            }
-        })
+        match e {
+            DriverQueryMetadataError::ColumnTypeExtractionFailed { source } => with_cause(
+                QueryMetadataError::new_err("Failed to extract column type from metadata"),
+                *source,
+            ),
+        }
     }
 }

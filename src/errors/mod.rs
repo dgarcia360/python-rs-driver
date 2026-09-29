@@ -80,6 +80,12 @@ create_exception!(errors, QueryMetadataError, ScyllaError);
 // For errors originating from our own Rust code, we create a custom Python exception with a descriptive message,
 // and we can include any relevant information in the message or as attributes.
 
+/// Sets `cause` as the `__cause__` of `err`.
+pub(crate) fn with_cause(err: PyErr, cause: PyErr) -> PyErr {
+    Python::attach(|py| err.set_cause(py, Some(cause)));
+    err
+}
+
 pub(crate) fn get_type_name(obj: Borrowed<PyAny>) -> String {
     obj.get_type()
         .name()

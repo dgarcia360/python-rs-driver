@@ -4,7 +4,7 @@ use scylla::errors::UseKeyspaceError as RustUseKeyspaceError;
 use crate::errors::{
     BadKeyspaceNameError, ExecuteError, KeyspaceNameMismatchError, PrepareError, RequestError,
     RequestTimeoutError, RuntimeTaskJoinFailedError, SchemaAgreementError, SessionConnectionError,
-    StatementConversionError, get_type_name,
+    StatementConversionError, get_type_name, with_cause,
 };
 
 /* Connection errors */
@@ -104,7 +104,7 @@ impl DriverStatementConversionError {
 
 impl From<DriverStatementConversionError> for PyErr {
     fn from(e: DriverStatementConversionError) -> PyErr {
-        Python::attach(|py| match e {
+        match e {
             DriverStatementConversionError::InvalidStatementType { type_name: got } => {
                 StatementConversionError::new_err(format!(
                     "Invalid statement type: expected a str, Statement, or PreparedStatement, got {got}"
@@ -112,12 +112,12 @@ impl From<DriverStatementConversionError> for PyErr {
             }
 
             DriverStatementConversionError::StatementStringConversionFailed { source } => {
-                let err = StatementConversionError::new_err(
-                    "Failed to convert statement string to Rust string",
-                );
-
-                err.set_cause(py, Some(*source));
-                err
+                with_cause(
+                    StatementConversionError::new_err(
+                        "Failed to convert statement string to Rust string",
+                    ),
+                    *source,
+                )
             }
 
             // Raised as a `PrepareError` rather than a `StatementConversionError`:
@@ -127,7 +127,7 @@ impl From<DriverStatementConversionError> for PyErr {
                     "Cannot prepare a PreparedStatement; expected a str or Statement",
                 )
             }
-        })
+        }
     }
 }
 

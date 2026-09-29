@@ -4,7 +4,7 @@ use pyo3::types::PyNone;
 use crate::errors::execution::DriverExecuteError;
 use crate::errors::{
     DecodeFailedError, PyConversionFailedError, RowIterationError,
-    UnsupportedTypeDeserializationError,
+    UnsupportedTypeDeserializationError, with_cause,
 };
 
 /* Row iteration errors */
@@ -23,31 +23,18 @@ impl From<DriverRowIterationError> for PyErr {
     fn from(e: DriverRowIterationError) -> PyErr {
         match e {
             DriverRowIterationError::Deserialization(e) => e.into(),
-            DriverRowIterationError::FailedToFetchNextPage(e) => {
-                // Add extra context while preserving the original ExecuteErrorPy as cause
-                Python::attach(|py| {
-                    let err = RowIterationError::new_err(
-                        "Row iteration error: failed to fetch next page of results",
-                    );
-
-                    // Wrap the inner ExecuteErrorPy as the cause
-                    let cause: PyErr = e.into();
-                    err.set_cause(py, Some(cause));
-                    err
-                })
-            }
-            DriverRowIterationError::PythonError(e) => {
-                Python::attach(|py| {
-                    let err = RowIterationError::new_err(
-                        "Row iteration error: a Python error occurred during processing of a row",
-                    );
-
-                    // Attach original python exception as cause
-                    err.set_cause(py, Some(e));
-
-                    err
-                })
-            }
+            DriverRowIterationError::FailedToFetchNextPage(e) => with_cause(
+                RowIterationError::new_err(
+                    "Row iteration error: failed to fetch next page of results",
+                ),
+                e.into(),
+            ),
+            DriverRowIterationError::PythonError(e) => with_cause(
+                RowIterationError::new_err(
+                    "Row iteration error: a Python error occurred during processing of a row",
+                ),
+                e,
+            ),
         }
     }
 }
