@@ -815,12 +815,9 @@ pub enum DriverLoadBalancingPolicyError {
 
 impl DriverLoadBalancingPolicyError {
     pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
-        let type_name = obj
-            .get_type()
-            .name()
-            .map(|n| n.to_string())
-            .unwrap_or_else(|_| "UnknownType".to_string());
-        Self::InvalidPolicy { type_name }
+        Self::InvalidPolicy {
+            type_name: get_type_name(obj),
+        }
     }
 
     pub fn default_policy_string_conversion_failed(source: PyErr) -> Self {
