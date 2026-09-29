@@ -165,15 +165,9 @@ impl PyClusterState {
 /// Errors that can occur during cluster state operations.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum DriverClusterStateTokenError {
-    /// Failed to calculate token.
-    #[error("{message}")]
-    TokenCalculation { message: String },
-    /// Failed to serialize values required to compute partition key.
-    #[error("{message}")]
-    Serialization { message: String },
-    /// `ClusterState` doesn't currently have metadata for the requested table.
-    #[error("{message}")]
-    UnknownTable { message: String },
+    /// The Rust driver failed to compute the token (calculation, serialization or unknown table).
+    #[error(transparent)]
+    RustDriverTokenError(#[from] RustClusterStateTokenError),
     /// An FFI-related error occurred (e.g., Python conversion, node creation).
     #[error(transparent)]
     PythonConversionFailed(PyErr),
@@ -182,24 +176,6 @@ pub(crate) enum DriverClusterStateTokenError {
 impl DriverClusterStateTokenError {
     pub(crate) fn python_conversion_failed(err: PyErr) -> Self {
         Self::PythonConversionFailed(err)
-    }
-}
-
-impl From<RustClusterStateTokenError> for DriverClusterStateTokenError {
-    fn from(e: RustClusterStateTokenError) -> Self {
-        #[deny(clippy::wildcard_enum_match_arm)]
-        match e {
-            RustClusterStateTokenError::TokenCalculation(e) => Self::TokenCalculation {
-                message: e.to_string(),
-            },
-            RustClusterStateTokenError::Serialization(e) => Self::Serialization {
-                message: e.to_string(),
-            },
-            RustClusterStateTokenError::UnknownTable { keyspace, table } => Self::UnknownTable {
-                message: format!("Can't find metadata for requested table ({keyspace}.{table})."),
-            },
-            _ => unreachable!("clippy testifies that the match is exhaustive"),
-        }
     }
 }
 

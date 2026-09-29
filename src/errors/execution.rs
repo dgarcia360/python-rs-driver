@@ -254,63 +254,36 @@ impl From<tokio::task::JoinError> for DriverSchemaAgreementError {
 /// Errors that can occur during use_keyspace operation on a session object.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum DriverUseKeyspaceError {
-    #[error("{message}")]
-    BadKeyspaceName { message: String },
-    #[error("{message}")]
-    RequestError { message: String },
-    #[error("{message}")]
-    KeyspaceNameMismatch { message: String },
-    #[error("{message}")]
-    RequestTimeout { message: String },
-    #[error("{message}")]
-    RuntimeTaskJoinFailed { message: String },
-}
-
-impl From<RustUseKeyspaceError> for DriverUseKeyspaceError {
-    fn from(e: RustUseKeyspaceError) -> Self {
-        #[deny(clippy::wildcard_enum_match_arm)]
-        match e {
-            RustUseKeyspaceError::BadKeyspaceName(_) => Self::BadKeyspaceName {
-                message: e.to_string(),
-            },
-            RustUseKeyspaceError::RequestError(_) => Self::RequestError {
-                message: e.to_string(),
-            },
-            RustUseKeyspaceError::KeyspaceNameMismatch { .. } => Self::KeyspaceNameMismatch {
-                message: e.to_string(),
-            },
-            RustUseKeyspaceError::RequestTimeout(_) => Self::RequestTimeout {
-                message: e.to_string(),
-            },
-            _ => unreachable!("clippy testifies that the match is exhaustive"),
-        }
-    }
-}
-
-impl From<tokio::task::JoinError> for DriverUseKeyspaceError {
-    fn from(e: tokio::task::JoinError) -> Self {
-        let message = e.to_string();
-        Self::RuntimeTaskJoinFailed {
-            message: format!(
-                "Internal driver error: runtime error while using keyspace: {message}"
-            ),
-        }
-    }
+    /// The Rust driver failed to switch the keyspace.
+    #[error(transparent)]
+    RustDriverUseKeyspaceError(#[from] RustUseKeyspaceError),
+    /// The Tokio runtime task responsible for switching the keyspace failed to join.
+    #[error("Internal driver error: runtime error while using keyspace: {0}")]
+    RuntimeTaskJoinFailed(#[from] tokio::task::JoinError),
 }
 
 impl From<DriverUseKeyspaceError> for PyErr {
     fn from(e: DriverUseKeyspaceError) -> Self {
         let message = e.to_string();
         match e {
-            DriverUseKeyspaceError::BadKeyspaceName { .. } => {
-                BadKeyspaceNameError::new_err(message)
+            DriverUseKeyspaceError::RustDriverUseKeyspaceError(source) =>
+            {
+                #[deny(clippy::wildcard_enum_match_arm)]
+                match source {
+                    RustUseKeyspaceError::BadKeyspaceName(_) => {
+                        BadKeyspaceNameError::new_err(message)
+                    }
+                    RustUseKeyspaceError::RequestError(_) => RequestError::new_err(message),
+                    RustUseKeyspaceError::KeyspaceNameMismatch { .. } => {
+                        KeyspaceNameMismatchError::new_err(message)
+                    }
+                    RustUseKeyspaceError::RequestTimeout(_) => {
+                        RequestTimeoutError::new_err(message)
+                    }
+                    _ => unreachable!("clippy testifies that the match is exhaustive"),
+                }
             }
-            DriverUseKeyspaceError::RequestError { .. } => RequestError::new_err(message),
-            DriverUseKeyspaceError::KeyspaceNameMismatch { .. } => {
-                KeyspaceNameMismatchError::new_err(message)
-            }
-            DriverUseKeyspaceError::RequestTimeout { .. } => RequestTimeoutError::new_err(message),
-            DriverUseKeyspaceError::RuntimeTaskJoinFailed { .. } => {
+            DriverUseKeyspaceError::RuntimeTaskJoinFailed(_) => {
                 RuntimeTaskJoinFailedError::new_err(message)
             }
         }
