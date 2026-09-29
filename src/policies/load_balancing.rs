@@ -819,13 +819,13 @@ pub enum DriverLoadBalancingPolicyError {
 }
 
 impl DriverLoadBalancingPolicyError {
-    pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidPolicy {
             type_name: get_type_name(obj),
         }
     }
 
-    pub fn default_policy_string_conversion_failed(source: PyErr) -> Self {
+    pub(crate) fn default_policy_string_conversion_failed(source: PyErr) -> Self {
         Self::DefaultPolicyStringConversionFailed {
             source: Box::new(source),
         }
@@ -862,13 +862,13 @@ pub enum TargetConversionError {
 }
 
 impl TargetConversionError {
-    pub fn invalid_node(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_node(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidNode {
             type_name: get_type_name(obj),
         }
     }
 
-    pub fn invalid_shard_type(source: PyErr) -> Self {
+    pub(crate) fn invalid_shard_type(source: PyErr) -> Self {
         Self::InvalidShardType {
             source: Box::new(source),
         }

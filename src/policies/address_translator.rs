@@ -268,12 +268,12 @@ pub enum DriverAddressTranslationError {
 }
 
 impl DriverAddressTranslationError {
-    pub fn translation_error(source: TranslationError) -> Self {
+    pub(crate) fn translation_error(source: TranslationError) -> Self {
         Self::TranslationError {
             source: Box::new(source),
         }
     }
-    pub fn invalid_address(index: usize, source: AddressParseError) -> Self {
+    pub(crate) fn invalid_address(index: usize, source: AddressParseError) -> Self {
         Self::InvalidAddressAtIndex { index, source }
     }
 }

@@ -248,19 +248,19 @@ pub enum AddressParseError {
 }
 
 impl AddressParseError {
-    pub fn invalid_type(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_type(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidType {
             type_name: get_type_name(obj),
         }
     }
 
-    pub fn iteration_failed(source: PyErr) -> Self {
+    pub(crate) fn iteration_failed(source: PyErr) -> Self {
         Self::IterationFailed {
             source: Box::new(source),
         }
     }
 
-    pub fn invalid_item(index: usize, source: PyErr) -> Self {
+    pub(crate) fn invalid_item(index: usize, source: PyErr) -> Self {
         Self::InvalidItem {
             index,
             source: Box::new(source),
@@ -292,7 +292,7 @@ pub enum DurationParseError {
 }
 
 impl DurationParseError {
-    pub fn invalid_type(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_type(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidType {
             type_name: get_type_name(obj),
         }

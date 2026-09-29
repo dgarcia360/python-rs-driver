@@ -315,7 +315,7 @@ pub enum DriverRetryPolicyError {
 }
 
 impl DriverRetryPolicyError {
-    pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
         let type_name = get_type_name(obj);
         Self::InvalidPolicy { type_name }
     }

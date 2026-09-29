@@ -120,7 +120,7 @@ pub(crate) enum DriverQueryMetadataError {
 
 impl DriverQueryMetadataError {
     /* Constructors */
-    pub fn column_type_extraction_failed(source: PyErr) -> Self {
+    pub(crate) fn column_type_extraction_failed(source: PyErr) -> Self {
         Self::ColumnTypeExtractionFailed {
             source: Box::new(source),
         }

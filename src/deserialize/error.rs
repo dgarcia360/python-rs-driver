@@ -93,10 +93,6 @@ pub enum DeserializationErrorKind {
     /// (e.g. invalid UTF-8, unsupported type for Python conversion, etc.).
     #[error("Python conversion failed")]
     PythonConversionFailed { source: Box<pyo3::PyErr> },
-    /// Driver invariant violated: a deserializer was called for a mismatched ColumnType.
-    /// This indicates a bug in our dispatch logic.
-    #[error("{message}")]
-    WrongDeserializer { message: Box<str> },
 }
 
 impl DeserializationErrorLocation {
@@ -140,21 +136,21 @@ impl Error for DriverDeserializationError {
 impl DriverDeserializationError {
     /* Constructors */
 
-    pub fn unsupported_type(cql: impl Into<Box<str>>) -> Self {
+    pub(crate) fn unsupported_type(cql: impl Into<Box<str>>) -> Self {
         Self {
             kind: DeserializationErrorKind::UnsupportedType { cql: cql.into() },
             location: DeserializationErrorLocation::default(),
         }
     }
 
-    pub fn scylla_decode_failed(source: scylla::deserialize::DeserializationError) -> Self {
+    pub(crate) fn scylla_decode_failed(source: scylla::deserialize::DeserializationError) -> Self {
         Self {
             kind: DeserializationErrorKind::ScyllaDecodeFailed { source },
             location: DeserializationErrorLocation::default(),
         }
     }
 
-    pub fn python_conversion_failed(source: pyo3::PyErr) -> Self {
+    pub(crate) fn python_conversion_failed(source: pyo3::PyErr) -> Self {
         Self {
             kind: DeserializationErrorKind::PythonConversionFailed {
                 source: Box::new(source),
@@ -163,28 +159,14 @@ impl DriverDeserializationError {
         }
     }
 
-    pub fn wrong_deserializer(expected: &'static str, got: impl Into<Box<str>>) -> Self {
-        let got = got.into();
-        let message = format!(
-            "Internal driver error: wrong deserializer selected (expected {expected}, got {got})"
-        );
-
-        Self {
-            kind: DeserializationErrorKind::WrongDeserializer {
-                message: message.into_boxed_str(),
-            },
-            location: DeserializationErrorLocation::default(),
-        }
-    }
-
     /* Column setters */
 
-    pub fn at_column_name(mut self, name: impl Into<Box<str>>) -> Self {
+    pub(crate) fn at_column_name(mut self, name: impl Into<Box<str>>) -> Self {
         self.location.column_name = Some(name.into());
         self
     }
 
-    pub fn at_column_index(mut self, index: usize) -> Self {
+    pub(crate) fn at_column_index(mut self, index: usize) -> Self {
         self.location.column_index = Some(index);
         self
     }
@@ -197,27 +179,27 @@ impl DriverDeserializationError {
         self.location.inner = v.into_boxed_slice();
     }
 
-    pub fn in_sequence_index(mut self, index: usize) -> Self {
+    pub(crate) fn in_sequence_index(mut self, index: usize) -> Self {
         self.push_inner(InnerSegment::SequenceIndex(index));
         self
     }
 
-    pub fn in_map_index(mut self, index: usize) -> Self {
+    pub(crate) fn in_map_index(mut self, index: usize) -> Self {
         self.push_inner(InnerSegment::MapIndex(index));
         self
     }
 
-    pub fn in_tuple_index(mut self, index: usize) -> Self {
+    pub(crate) fn in_tuple_index(mut self, index: usize) -> Self {
         self.push_inner(InnerSegment::TupleIndex(index));
         self
     }
 
-    pub fn in_udt_field(mut self, field: impl Into<Box<str>>) -> Self {
+    pub(crate) fn in_udt_field(mut self, field: impl Into<Box<str>>) -> Self {
         self.push_inner(InnerSegment::UdtField(field.into()));
         self
     }
 
-    pub fn in_vector_index(mut self, index: usize) -> Self {
+    pub(crate) fn in_vector_index(mut self, index: usize) -> Self {
         self.push_inner(InnerSegment::VectorIndex(index));
         self
     }
@@ -259,9 +241,6 @@ impl From<DriverDeserializationError> for PyErr {
             }
             DeserializationErrorKind::PythonConversionFailed { source } => {
                 (PyConversionFailedError::new_err(message), Some(*source))
-            }
-            DeserializationErrorKind::WrongDeserializer { .. } => {
-                (PyConversionFailedError::new_err(message), None)
             }
         };
 

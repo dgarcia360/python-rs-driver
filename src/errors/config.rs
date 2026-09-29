@@ -44,25 +44,25 @@ pub enum DriverSessionConfigError {
 
 impl DriverSessionConfigError {
     /* Constructors */
-    pub fn invalid_authenticator_provider(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_authenticator_provider(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidAuthenticatorProvider {
             type_name: get_type_name(obj),
         }
     }
 
-    pub fn invalid_address_translator(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_address_translator(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidAddressTranslator {
             type_name: get_type_name(obj),
         }
     }
 
-    pub fn invalid_timestamp_generator(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_timestamp_generator(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidTimestampGenerator {
             type_name: get_type_name(obj),
         }
     }
 
-    pub fn invalid_host_filter(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_host_filter(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidHostFilter {
             type_name: get_type_name(obj),
         }
@@ -98,17 +98,17 @@ pub enum DriverStatementConfigError {
 impl DriverStatementConfigError {
     /* Constructors */
 
-    pub fn invalid_request_timeout(value: f64) -> Self {
+    pub(crate) fn invalid_request_timeout(value: f64) -> Self {
         Self::InvalidRequestTimeout { value }
     }
 
-    pub fn python_conversion_failed(source: PyErr) -> Self {
+    pub(crate) fn python_conversion_failed(source: PyErr) -> Self {
         Self::PythonConversionFailed {
             source: Box::new(source),
         }
     }
 
-    pub fn invalid_retry_policy(source: DriverRetryPolicyError) -> Self {
+    pub(crate) fn invalid_retry_policy(source: DriverRetryPolicyError) -> Self {
         Self::InvalidRetryPolicy {
             source: Box::new(source),
         }

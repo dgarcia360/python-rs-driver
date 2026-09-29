@@ -99,7 +99,7 @@ pub enum DriverSpeculativeExecutionPolicyError {
 }
 
 impl DriverSpeculativeExecutionPolicyError {
-    pub fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_policy(obj: Borrowed<PyAny>) -> Self {
         Self::InvalidPolicy {
             type_name: get_type_name(obj),
         }

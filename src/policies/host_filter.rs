@@ -283,7 +283,7 @@ pub enum DriverHostFilterError {
 }
 
 impl DriverHostFilterError {
-    pub fn invalid_address(source: std::io::Error) -> Self {
+    pub(crate) fn invalid_address(source: std::io::Error) -> Self {
         Self::InvalidAddress { source }
     }
 }

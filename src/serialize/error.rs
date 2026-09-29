@@ -87,35 +87,35 @@ impl Error for DriverSerializationError {
 impl DriverSerializationError {
     /* Constructors */
 
-    pub fn unsupported_type(cql: impl Into<Box<str>>) -> Self {
+    pub(crate) fn unsupported_type(cql: impl Into<Box<str>>) -> Self {
         Self {
             kind: SerializationErrorKind::UnsupportedType { cql: cql.into() },
             location: None,
         }
     }
 
-    pub fn type_mismatch(expected: TypeExpected) -> Self {
+    pub(crate) fn type_mismatch(expected: TypeExpected) -> Self {
         Self {
             kind: SerializationErrorKind::TypeMismatch { expected },
             location: None,
         }
     }
 
-    pub fn value_overflow() -> Self {
+    pub(crate) fn value_overflow() -> Self {
         Self {
             kind: SerializationErrorKind::ValueOverflow,
             location: None,
         }
     }
 
-    pub fn scylla_serialize_failed(source: scylla::serialize::SerializationError) -> Self {
+    pub(crate) fn scylla_serialize_failed(source: scylla::serialize::SerializationError) -> Self {
         Self {
             kind: SerializationErrorKind::ScyllaSerializeFailed { source },
             location: None,
         }
     }
 
-    pub fn python_interop_failed(source: PyErr) -> Self {
+    pub(crate) fn python_interop_failed(source: PyErr) -> Self {
         Self {
             kind: SerializationErrorKind::PythonInteropFailed {
                 source: Box::new(source),
@@ -126,12 +126,12 @@ impl DriverSerializationError {
 
     /* Top-level location setters */
 
-    pub fn at_parameter_index(mut self, index: usize) -> Self {
+    pub(crate) fn at_parameter_index(mut self, index: usize) -> Self {
         self.location = Some(ParameterReference::Index(index));
         self
     }
 
-    pub fn at_parameter_name(mut self, name: impl Into<Box<str>>) -> Self {
+    pub(crate) fn at_parameter_name(mut self, name: impl Into<Box<str>>) -> Self {
         self.location = Some(ParameterReference::Name(name.into()));
         self
     }

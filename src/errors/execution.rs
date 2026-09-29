@@ -29,11 +29,11 @@ pub enum DriverSessionConnectionError {
 impl DriverSessionConnectionError {
     /* Constructors */
 
-    pub fn runtime_task_join_failed(message: String) -> Self {
+    pub(crate) fn runtime_task_join_failed(message: String) -> Self {
         Self::RuntimeTaskJoinFailed { message }
     }
 
-    pub fn new_session_error(source: scylla::errors::NewSessionError) -> Self {
+    pub(crate) fn new_session_error(source: scylla::errors::NewSessionError) -> Self {
         Self::NewSessionError {
             source: Box::new(source),
         }
@@ -81,16 +81,16 @@ pub enum DriverStatementConversionError {
 impl DriverStatementConversionError {
     /* Constructors */
 
-    pub fn invalid_statement_type(obj: Borrowed<PyAny>) -> Self {
+    pub(crate) fn invalid_statement_type(obj: Borrowed<PyAny>) -> Self {
         let type_name = get_type_name(obj);
         Self::InvalidStatementType { type_name }
     }
 
-    pub fn cannot_prepare_prepared_statement() -> Self {
+    pub(crate) fn cannot_prepare_prepared_statement() -> Self {
         Self::CannotPreparePreparedStatement
     }
 
-    pub fn statement_string_conversion_failed(source: PyErr) -> Self {
+    pub(crate) fn statement_string_conversion_failed(source: PyErr) -> Self {
         Self::StatementStringConversionFailed {
             source: Box::new(source),
         }
@@ -142,23 +142,23 @@ pub enum DriverExecuteError {
 impl DriverExecuteError {
     /* Constructors */
 
-    pub fn paging_state_must_be_none_for_unpaged_execution() -> Self {
+    pub(crate) fn paging_state_must_be_none_for_unpaged_execution() -> Self {
         Self::PagingStateMustBeNoneForUnpagedExecution
     }
 
-    pub fn rust_driver_execution_error(source: scylla::errors::ExecutionError) -> Self {
+    pub(crate) fn rust_driver_execution_error(source: scylla::errors::ExecutionError) -> Self {
         Self::RustDriverExecutionError {
             source: Box::new(source),
         }
     }
 
-    pub fn runtime_task_join_failed(err: tokio::task::JoinError) -> Self {
+    pub(crate) fn runtime_task_join_failed(err: tokio::task::JoinError) -> Self {
         Self::RuntimeTaskJoinFailed {
             message: err.to_string().into_boxed_str(),
         }
     }
 
-    pub fn serialization_failed(source: scylla::serialize::SerializationError) -> Self {
+    pub(crate) fn serialization_failed(source: scylla::serialize::SerializationError) -> Self {
         Self::SerializationFailed { source }
     }
 }
@@ -192,7 +192,7 @@ pub enum DriverPrepareError {
 impl DriverPrepareError {
     /* Constructors */
 
-    pub fn rust_driver_prepare_error(source: scylla::errors::PrepareError) -> Self {
+    pub(crate) fn rust_driver_prepare_error(source: scylla::errors::PrepareError) -> Self {
         Self::RustDriverPrepareError {
             source: Box::new(source),
         }
@@ -222,7 +222,7 @@ pub enum DriverSchemaAgreementError {
 impl DriverSchemaAgreementError {
     /* Constructors */
 
-    pub fn rust_driver_schema_agreement_error(
+    pub(crate) fn rust_driver_schema_agreement_error(
         source: scylla::errors::SchemaAgreementError,
     ) -> Self {
         Self::RustDriverSchemaAgreementError {
@@ -230,7 +230,7 @@ impl DriverSchemaAgreementError {
         }
     }
 
-    pub fn runtime_task_join_failed(err: tokio::task::JoinError) -> Self {
+    pub(crate) fn runtime_task_join_failed(err: tokio::task::JoinError) -> Self {
         Self::RuntimeTaskJoinFailed {
             message: err.to_string().into_boxed_str(),
         }

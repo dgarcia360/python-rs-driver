@@ -341,17 +341,17 @@ pub enum DriverBatchError {
 impl DriverBatchError {
     /* Constructors */
 
-    pub fn invalid_request_timeout(value: f64) -> Self {
+    pub(crate) fn invalid_request_timeout(value: f64) -> Self {
         Self::InvalidRequestTimeout { value }
     }
 
-    pub fn python_conversion_failed(source: PyErr) -> Self {
+    pub(crate) fn python_conversion_failed(source: PyErr) -> Self {
         Self::PythonConversionFailed {
             source: Box::new(source),
         }
     }
 
-    pub fn invalid_retry_policy(source: DriverRetryPolicyError) -> Self {
+    pub(crate) fn invalid_retry_policy(source: DriverRetryPolicyError) -> Self {
         Self::InvalidRetryPolicy {
             source: Box::new(source),
         }
