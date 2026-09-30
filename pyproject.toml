@@ -45,13 +45,15 @@ dev = [
     "ruff>=0.16.0",
     "basedpyright",
     "python-dateutil",
-    "cryptography>=42",
+    "cryptography>=42; python_version >= '3.11'",
+    "cryptography>=42,!=50.0.2; python_version < '3.11'",
     "ccm @ git+https://git@github.com/scylladb/scylla-ccm.git@master",
 ]
 
 
 tls-integration = [
-    "cryptography>=49.0.0",
+    "cryptography>=49.0.0; python_version >= '3.11'",
+    "cryptography>=49.0.0,!=50.0.2; python_version < '3.11'",
     "cffi>=2.0.0",
 ]
 
