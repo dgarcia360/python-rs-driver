@@ -81,7 +81,7 @@ extend-select = ["TID251", "ASYNC"]
 
 [tool.basedpyright]
 # Sphinx configuration uses the separate dependencies and Python version in docs/pyproject.toml.
-exclude = ["docs/source/conf.py"]
+include = ["python", "examples"]
 extraPaths = ["python/tests"]
 pythonVersion = "3.10"
 venvPath = "."

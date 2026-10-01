@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import tomllib
 from sphinx_scylladb_theme.utils import multiversion_regex_builder
 
 DOCS_SOURCE = Path(__file__).resolve().parent
@@ -55,9 +56,10 @@ copyright = "2026, ScyllaDB"
 
 author = "ScyllaDB"
 
-version = "0.1.0"
+with (REPO_ROOT / "Cargo.toml").open("rb") as cargo_toml:
+    release = tomllib.load(cargo_toml)["package"]["version"]
 
-release = "0.1.0"
+version = release
 
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/_partials"]
 
