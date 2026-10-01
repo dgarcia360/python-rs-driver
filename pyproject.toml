@@ -47,6 +47,7 @@ dev = [
     "python-dateutil",
     "cryptography>=42; python_version >= '3.11'",
     "cryptography>=42,!=50.0.2; python_version < '3.11'",
+    "uvloop; sys_platform != 'win32'",
     "ccm @ git+https://git@github.com/scylladb/scylla-ccm.git@master",
 ]
 
